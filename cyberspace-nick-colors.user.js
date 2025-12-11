@@ -1,5 +1,6 @@
 // ==UserScript==
 // @name         Cyberspace Nick Colors
+// @author       https://z0m.bi/ (@z0ylent)
 // @namespace    https://cyberspace.online/
 // @version      1.0
 // @description  Consistent bright colors for usernames across the site
@@ -8,6 +9,9 @@
 // @grant        GM.registerMenuCommand
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
+// @connect      raw.githubusercontent.com
+// @connect      gist.githubusercontent.com
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -36,12 +40,17 @@
 	// CONFIGURATION
 	// =====================================================
 
+	// URL to fetch manual overrides from (set to null to disable)
+	// Host your overrides.json on GitHub, Gist, or any CORS-friendly location
+	const OVERRIDES_URL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/overrides.json';
+
 	// Manual color overrides - set specific users to specific styles
 	// Format: 'username': { ...CSS style properties }
 	// Or simple format: 'username': 'css-color' (text color only)
-	const MANUAL_OVERRIDES = {
-	  'z0ylent': { color: '#00FF00' },
-	  'frexxx': { color: '#5a8a55', backgroundColor: '#000000' }
+	// These are merged with fetched overrides (local takes precedence)
+	// Add local overrides here for testing, or they will be fetched from OVERRIDES_URL
+	let MANUAL_OVERRIDES = {
+		'z0ylent': { color: '#00FF00' },
 	};
 
 	// Try to read site's custom theme from localStorage
@@ -244,6 +253,7 @@
 	const CONTAINER_HINTS_EXCLUDE = [
 		'.sidebar',
 		'footer',
+		'.nc-dialog-attribution'
 	];
 
 	// Containers where we should invert backgroundColor/Color for nicks
@@ -617,19 +627,19 @@
 	sliderStyles.textContent = `
 		.nc-slider { position: relative; height: 24px; margin: 0.5rem 0; }
 		.nc-slider-track {
-			position: absolute; 
+			position: absolute;
 			inset: 4px 0;
-			border: 1px solid var(--color-border, #333); 
-			background: var(--color-code-bg, #444); 
+			border: 1px solid var(--color-border, #333);
+			background: var(--color-code-bg, #444);
 			box-sizing: border-box;
 		}
 		.nc-slider-thumb {
 			position: absolute; top: 0; width: 14px; height: 22px;
-			background: var(--color-fg, #fff); 
+			background: var(--color-fg, #fff);
 			border: 1px solid var(--color-border, #333);
 			cursor: ew-resize; transform: translateX(-50%); z-index: 2;
 			display: flex; align-items: center; justify-content: center;
-			font-size: 8px; 
+			font-size: 8px;
 			color: var(--color-bg, #000); user-select: none;
 		}
 		.nc-slider-thumb:hover { background: var(--color-fg-dim, #ccc); }
@@ -637,22 +647,38 @@
 			display: flex; justify-content: space-between; margin-top: 2px;
 			font-size: 0.625rem; color: var(--color-fg-dim, #888);
 		}
+		/* Simple single-value slider style */
+		.nc-slider.nc-slider-simple { height: 16px; }
+		.nc-slider-simple .nc-slider-track {
+			inset: 7px 0; height: 2px;
+			border: none;
+			background: var(--color-border, #333);
+		}
+		.nc-slider-simple .nc-slider-thumb {
+			top: 3px; width: 10px; height: 10px;
+			border-radius: 50%;
+		}
+		.nc-slider-simple .nc-slider-thumb::before {
+			content: '';
+			position: absolute;
+			inset: -8px;
+		}
 	`;
 	document.head.appendChild(sliderStyles);
 
 	/**
 	 * Creates a slider (single or range type)
-	 * @param {Object} opts - { type: 'single'|'range', min, max, value/values, gradient, onChange, label }
+	 * @param {Object} opts - { type: 'single'|'range', simple, min, max, value/values, gradient, onChange, label }
 	 * @returns {Object} - { el, getValue/getValues, setValue/setValues, setGradient }
 	 */
 	function createSlider(opts) {
-		const { type = 'single', min = 0, max = 100, onChange, label } = opts;
+		const { type = 'single', simple = false, min = 0, max = 100, onChange, label } = opts;
 		const isRange = type === 'range';
 
 		const container = document.createElement('div');
 		container.innerHTML = `
 			${label ? `<label style="display:block;margin:0.5rem 0 0.25rem;font-size:0.75rem;color:var(--color-fg-dim,#888)">${label}</label>` : ''}
-			<div class="nc-slider">
+			<div class="nc-slider${simple ? ' nc-slider-simple' : ''}">
 				<div class="nc-slider-track"></div>
 				${isRange ? '<div class="nc-slider-thumb" data-i="0">▶</div><div class="nc-slider-thumb" data-i="1">◀</div>'
 						 : '<div class="nc-slider-thumb" data-i="0"></div>'}
@@ -830,18 +856,28 @@
 			align-items: center; justify-content: center; z-index: 999999;
 		}
 		.nc-dialog {
-			background: var(--color-bg, #0a0a0a); border: 1px solid var(--color-border, #333);
-			color: var(--color-fg, #eee); max-height: 80vh; display: flex; flex-direction: column;
+			background: var(--color-bg, #0a0a0a); 
+			border: 1px solid var(--color-border, #333);
+			color: var(--color-fg, #eee); 
+			max-height: 80vh; display: flex; flex-direction: column;
+		}
+		.nc-dialog .spacer {
+			flex: 1;
 		}
 		.nc-dialog-header {
-			padding: 1rem 1rem 0.5rem; border-bottom: 1px solid var(--color-border, #333);
+			padding: 1rem 1rem 0.5rem; 
+			border-bottom: 1px solid var(--color-border, #333);
 			flex-shrink: 0;
+			width: 100%; 
+			box-sizing: border-box;
+			gap: 0.5rem;
 		}
 		.nc-dialog-content {
 			padding: 0.5rem 1rem; overflow-y: auto; flex: 1;
 		}
 		.nc-dialog-footer {
-			padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--color-border, #333);
+			padding: 0.5rem 1rem .5rem; 
+			border-top: 1px solid var(--color-border, #333);
 			flex-shrink: 0;
 		}
 		.nc-dialog h3 {
@@ -849,19 +885,65 @@
 			text-transform: uppercase; letter-spacing: 0.05em;
 		}
 		.nc-dialog h4 {
-			margin: 1rem 0 0.5rem 0; color: var(--color-fg-dim, #888); font-size: 0.75rem;
+			margin: 0.5rem 0; color: var(--color-fg, #FFF); 
+			font-size: 0.75rem;
 			text-transform: uppercase; letter-spacing: 0.1em;
-			border-top: 1px solid var(--color-border, #333); padding-top: 1rem;
 		}
-		.nc-dialog h4:first-child { margin-top: 0; border-top: none; padding-top: 0; }
-		.nc-dialog .buttons { display: flex; gap: 0.5rem; }
+		.nc-dialog h4:first-child { margin-top: 0; padding-top: 0; }
+		.nc-dialog hr {
+			border: 1px dashed var(--color-border, #333); 
+			background: transparent;
+			height: 0;
+			margin: 1rem 0;
+		}
+		.nc-dialog .nc-input-row, .nc-dialog .nc-input-row-stacked
+		{
+			padding: 0.5rem 0;
+			display: flex;
+			flex-direction: row;
+			gap: 0.5rem;
+		}
+		.nc-dialog .nc-input-row-stacked
+		{
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+		.nc-dialog .nc-input-row.no-padding-bottom, 
+		.nc-dialog .nc-input-row-stacked.no-padding-bottom
+		{
+			padding-bottom: 0;
+		}
+		.nc-dialog .nc-input-row.no-padding-top, 
+		.nc-dialog .nc-input-row-stacked.no-padding-top
+		{
+			padding-top: 0;
+		}
+		.nc-dialog .nc-input-row label
+		{
+			font-size: 0.75rem;
+			color: var(--color-fg, #fff);
+		}
+		.nc-dialog .nc-input-row .hint
+		{
+			font-size: 0.6rem;
+			color: var(--color-fg-dim, #fff);
+		}
+		.nc-dialog .buttons { 
+			display: flex; 
+			gap: 0.5rem; 
+			justify-content: flex-end;
+		}
 		.nc-dialog button {
-			flex: 1; padding: 0.5rem;
+			flex: 1; 
+			padding: 0.5rem;
 		}
 		.nc-dialog button:hover { border-color: var(--color-fg-dim, #666); }
 		.nc-dialog button.link-brackets {
-			background: none; border: none; padding: 0;
+			background: none; 
+			border: none; 
+			padding: 0;
 			color: var(--color-fg-dim, #888);
+			flex: 0;
 		}
 		.nc-dialog button.link-brackets:hover { border-color: var(--color-fg, #FFF); }
 		.nc-dialog button.link-brackets .inner::before {
@@ -876,49 +958,64 @@
 			font-family: inherit; font-size: 0.75rem; box-sizing: border-box;
 		}
 		.nc-dialog textarea { min-height: 70px; resize: vertical; }
-		.nc-dialog input[type="checkbox"] { margin-right: 0.5rem; }
-		.nc-dialog .checkbox-label {
-			display: flex; align-items: center; cursor: pointer;
-			color: var(--color-fg, #ccc); margin: 0.5rem 0; font-size: 0.75rem;
-		}
+		.nc-dialog .nc-toggle { display: flex; margin: 0.5rem 0; }
 		.nc-dialog .hint { font-size: 0.625rem; color: var(--color-fg-dim, #666); margin-top: 0.25rem; }
 		.nc-dialog .preview {
 			font-size: 0.875rem; margin: 0.75rem 0; padding: 0.5rem;
 			border: 1px solid var(--color-border, #333);
+			background-color: var(--color-code-bg, #222);
 		}
 		.nc-dialog .preview-row {
 			display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0;
 			padding: 0.5rem; border: 1px solid var(--color-border, #333);
 		}
 		.nc-dialog .preview-nick { padding: 0.125rem 0.25rem; }
+		.nc-dialog .nc-dialog-attribution {
+			width: 100%;
+			border-top: 1px dotted var(--color-border, #333);
+			margin-top: 0.3rem; font-size: 0.625rem; color: var(--color-fg-dim, #666);
+			padding-top: 0.3rem;
+			text-align: right;
+		}
+		.nc-dialog .nc-dialog-attribution a {
+			color: var(--color-fg-dim, #666); text-decoration: none;
+		}
 	`;
 	document.head.appendChild(dialogStyles);
 
 	/**
 	 * Creates a dialog with standard structure
-	 * @param {Object} opts - { title, content, buttons, width, onClose }
+	 * @param {Object} opts - { title, content, buttons, width, onClose, onSettings }
 	 * @returns {Object} - { el, close, querySelector, querySelectorAll }
 	 */
 	function createDialog(opts) {
-		const { title, content, buttons = [], width = '400px', onClose } = opts;
+		const { title, content, buttons = [], width = '400px', onClose, onSettings } = opts;
 
 		const overlay = document.createElement('div');
 		overlay.className = 'nc-dialog-overlay';
 		overlay.innerHTML = `
 			<div class="nc-dialog" style="min-width: ${width}; max-width: calc(${width} + 100px);">
-				<div class="nc-dialog-header">
-					<h3>${title}</h3>
+				<div class="nc-dialog-header flex justify-between">
+					<h3 class="tracking-wider">${title}</h3>
+					<div class="spacer"></div>
+					${onSettings ? '<button class="nc-header-settings link-brackets"><span class="inner">SETTINGS</span></button>' : ''}
+					<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 				</div>
 				<div class="nc-dialog-content">
 					${content}
 				</div>
-				${buttons.length > 0 ? `
 				<div class="nc-dialog-footer">
-					<div class="buttons">
+					<div class="buttons flex flex-wrap items-center gap-2">
 						${buttons.map(b => `<button class="${b.class || ''} link-brackets"><span class="inner">${b.label}</span></button>`).join('')}
 					</div>
+					<div class="nc-dialog-attribution hint flex justify-end gap-2">
+						<span>created by <a href="/z0ylent">@z0ylent</a></span>
+						<span> | </span>
+						<span><a href="https://z0m.bi" target="_blank">https://z0m.bi</a></span>
+						<span> | </span>
+						<span><a class="github-link" href="https://github.com/z0mbieparade/cyberspace-nick-colors" target="_blank" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" height="14px"> <path fill="currentColor" d="M5 2h4v2H7v2H5V2Zm0 10H3V6h2v6Zm2 2H5v-2h2v2Zm2 2v-2H7v2H3v-2H1v2h2v2h4v4h2v-4h2v-2H9Zm0 0v2H7v-2h2Zm6-12v2H9V4h6Zm4 2h-2V4h-2V2h4v4Zm0 6V6h2v6h-2Zm-2 2v-2h2v2h-2Zm-2 2v-2h2v2h-2Zm0 2h-2v-2h2v2Zm0 0h2v4h-2v-4Z"/> </svg></a></span>
+					</div>
 				</div>
-				` : ''}
 			</div>
 		`;
 
@@ -927,13 +1024,25 @@
 			onClose?.();
 		};
 
-		// Bind button handlers
+		// Bind footer button handlers
 		buttons.forEach(b => {
-			const btn = overlay.querySelector(`button.${b.class}`);
+			const btn = overlay.querySelector(`.nc-dialog-footer button.${b.class}`);
 			if (btn && b.onClick) {
 				btn.addEventListener('click', () => b.onClick(close));
 			}
 		});
+
+		// Bind header button handlers
+		const closeBtn = overlay.querySelector('.nc-header-close');
+		if (closeBtn) closeBtn.addEventListener('click', close);
+
+		const settingsBtn = overlay.querySelector('.nc-header-settings');
+		if (settingsBtn && onSettings) {
+			settingsBtn.addEventListener('click', () => {
+				close();
+				onSettings();
+			});
+		}
 
 		// Close on overlay click or Escape
 		overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -965,17 +1074,24 @@
 			.join('\n');
 
 		const dialog = createDialog({
-			title: `Color: ${username}`,
+			title: `Nick: ${username}`,
 			width: '320px',
+			onSettings: () => createSettingsPanel(),
 			content: `
 				<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Sample message</div>
-				<h4>Text Color</h4>
+				<hr />
+				<h4>Nick Color</h4>
 				<div id="picker-sliders"></div>
-				<label>Custom color value:</label>
-				<input type="text" id="picker-custom" placeholder="#ff6b6b or hsl(280, 90%, 65%)">
+				<div class="nc-input-row-stacked no-padding-bottom">
+					<label>Custom color value:</label>
+					<input type="text" id="picker-custom" placeholder="#ff6b6b or hsl(280, 90%, 65%)">
+				</div>
+				<hr />
 				<h4>Additional CSS</h4>
-				<textarea id="picker-css" placeholder="background-color: #1a1a2e;&#10;font-weight: bold;">${currentCssString}</textarea>
-				<div class="hint">CSS properties, one per line</div>
+				<div class="nc-input-row-stacked no-padding-top">
+					<textarea id="picker-css" placeholder="background-color: #1a1a2e;&#10;font-weight: bold;">${currentCssString}</textarea>
+					<div class="hint">CSS properties, one per line</div>
+				</div>
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
@@ -991,15 +1107,8 @@
 					refreshAllColors();
 					close();
 				}},
-				{ label: 'Settings', class: 'settings' },
 				{ label: 'Cancel', class: 'cancel', onClick: (close) => close() }
 			]
-		});
-
-		// Bind settings button separately to avoid hoisting issues
-		dialog.querySelector('.settings').addEventListener('click', () => {
-			dialog.close();
-			createSettingsPanel();
 		});
 
 		const preview = dialog.querySelector('#picker-preview');
@@ -1093,41 +1202,62 @@
 			title: 'Nick Color Settings',
 			width: '400px',
 			content: `
-				<h4>Preset Themes</h4>
-				<select id="settings-preset">
-					<option value="">-- Select a preset --</option>
-					${Object.keys(PRESET_THEMES).map(name => `<option value="${name}">${name}</option>`).join('')}
-				</select>
 				<h4>Preview</h4>
-				<div class="preview-row" id="settings-preview"></div>
-				<h4>Hue Range</h4>
+				<div class="preview preview-row" id="settings-preview"></div>
+				<hr />
+				<div class="nc-input-row-stacked">
+					<label for="settings-preset">Preset Theme:</label>
+					<select id="settings-preset">
+						<option value="">-- Select a preset --</option>
+						${Object.keys(PRESET_THEMES).map(name => `<option value="${name}">${name}</option>`).join('')}
+					</select>
+				</div>
+				<hr />
+				<h4>Hue Range${siteThemeHsl ? '' : ' <span class="text-fg-dim">(no site theme)</span>'}</h4>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Use site theme foreground hue${siteThemeHsl ? ` <span style="color:hsl(${siteThemeHsl.h}, 100%, 50%)">(${siteThemeHsl.h}°)</span>` : ''}</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${siteThemeConfig.useHueRange ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-site-hue" class="sr-only" ${siteThemeConfig.useHueRange ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${siteThemeConfig.useHueRange ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${siteThemeConfig.useHueRange ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
+				<div id="hue-spread-container" style="display: ${siteThemeConfig.useHueRange ? 'block' : 'none'}"></div>
 				<div id="hue-slider-container"></div>
-				<h4>Color Properties</h4>
+				<hr />
+				<h4>Saturation Range</h4>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Use site theme foreground saturation${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.s}%)</span>` : ''}</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${siteThemeConfig.useSaturation ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-site-saturation" class="sr-only" ${siteThemeConfig.useSaturation ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${siteThemeConfig.useSaturation ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${siteThemeConfig.useSaturation ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
 				<div id="sat-slider-container"></div>
+				<hr />
+				<h4>Lightness Range</h4>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Use site theme foreground lightness${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.l}%)</span>` : ''}</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${siteThemeConfig.useLightness ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-site-lightness" class="sr-only" ${siteThemeConfig.useLightness ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${siteThemeConfig.useLightness ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${siteThemeConfig.useLightness ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
 				<div id="lit-slider-container"></div>
+				<hr />
 				<h4>Contrast</h4>
 				<div class="hint" style="margin-top: -0.25rem; margin-bottom: 0.25rem;">
 					Reverse foreground and background when lightness contrast is below threshold (0 = disabled)
 				</div>
 				<div id="contrast-slider-container"></div>
-				<h4>Site Theme Integration${siteTheme ? '' : ' (no custom_theme found)'}</h4>
-				${siteThemeHsl ? `<div class="hint" style="margin-bottom: 0.5rem;">
-					Detected: <span style="color: ${siteTheme.fg}">${siteTheme.fg}</span>
-					(H:${siteThemeHsl.h} S:${siteThemeHsl.s}% L:${siteThemeHsl.l}%)
-				</div>` : ''}
-				<label class="checkbox-label">
-					<input type="checkbox" id="settings-site-hue" ${siteThemeConfig.useHueRange ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
-					Use site theme hue range
-				</label>
-				<div id="hue-spread-container" style="margin-left: 24px; opacity: ${siteThemeHsl ? '1' : '0.5'}"></div>
-				<label class="checkbox-label">
-					<input type="checkbox" id="settings-site-saturation" ${siteThemeConfig.useSaturation ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
-					Use site theme saturation
-				</label>
-				<label class="checkbox-label">
-					<input type="checkbox" id="settings-site-lightness" ${siteThemeConfig.useLightness ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
-					Use site theme lightness
-				</label>
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
@@ -1183,13 +1313,15 @@
 			label: 'Lightness Range', onChange: updatePreview
 		});
 		const contrastSlider = createSlider({
-			min: 0, max: 50, value: colorConfig.contrastThreshold || 0,
+			simple: true, min: 0, max: 50, value: colorConfig.contrastThreshold || 0,
 			label: 'Contrast Threshold', onChange: updatePreview
 		});
 		const hueSpreadSlider = createSlider({
-			min: 5, max: 180, value: siteThemeConfig.hueSpread,
-			label: 'Hue spread', onChange: updatePreview
+			simple: true, min: 5, max: 180, value: siteThemeConfig.hueSpread,
+			label: 'Hue spread', onChange: () => onHueSpreadChange()
 		});
+		// Defined later, called via closure
+		let onHueSpreadChange = () => {};
 
 		dialog.querySelector('#hue-slider-container').appendChild(hueSlider.el);
 		dialog.querySelector('#sat-slider-container').appendChild(satSlider.el);
@@ -1242,9 +1374,20 @@
 			const eff = getEffective();
 			const bgLightness = getBackgroundLightness();
 			previewRow.querySelectorAll('.preview-nick').forEach((el, i) => {
-				const hash = hashString(previewNames[i]);
-				const hash2 = hashString(previewNames[i] + '_sat');
-				const hash3 = hashString(previewNames[i] + '_lit');
+				const username = previewNames[i];
+
+				// Check for overrides first (same logic as generateStyles)
+				if (customNickColors[username] || MANUAL_OVERRIDES[username]) {
+					const styles = generateStyles(username);
+					el.style.cssText = '';
+					Object.assign(el.style, styles);
+					return;
+				}
+
+				// Generate from hash using current settings
+				const hash = hashString(username);
+				const hash2 = hashString(username + '_sat');
+				const hash3 = hashString(username + '_lit');
 				let range = eff.maxHue - eff.minHue; if (range <= 0) range += 360;
 				let hue = eff.minHue + (hash % Math.max(1, range)); if (hue >= 360) hue -= 360;
 				const satRange = eff.maxSaturation - eff.minSaturation;
@@ -1276,7 +1419,123 @@
 				updatePreview();
 			}
 		});
-		[siteHueInput, siteSaturationInput, siteLightnessInput].forEach(el => el?.addEventListener('change', updatePreview));
+
+		// Update toggle visual state
+		function updateToggle(checkbox) {
+			const label = checkbox.closest('.nc-toggle');
+			if (!label) return;
+			const isChecked = checkbox.checked;
+			const valueEl = label.querySelector('.nc-toggle-value');
+			const track = label.querySelector('.nc-toggle-track');
+			const thumb = label.querySelector('.nc-toggle-thumb');
+			if (valueEl) valueEl.textContent = isChecked ? 'true' : 'false';
+			if (track) {
+				track.classList.toggle('bg-fg', isChecked);
+				track.classList.toggle('bg-fg-dim', !isChecked);
+			}
+			if (thumb) {
+				thumb.classList.toggle('translate-x-5', isChecked);
+				thumb.classList.toggle('translate-x-0.5', !isChecked);
+			}
+		}
+
+		// Get slider container references for enabling/disabling
+		const hueSliderContainer = dialog.querySelector('#hue-slider-container');
+		const hueSpreadContainer = dialog.querySelector('#hue-spread-container');
+		const satSliderContainer = dialog.querySelector('#sat-slider-container');
+		const litSliderContainer = dialog.querySelector('#lit-slider-container');
+
+		// Update slider container enabled/disabled state
+		function updateSliderState(container, disabled) {
+			if (!container) return;
+			container.style.pointerEvents = disabled ? 'none' : 'auto';
+			// Grey out thumbs when disabled
+			const thumbs = container.querySelectorAll('.nc-slider-thumb');
+			thumbs.forEach(thumb => {
+				thumb.style.background = disabled ? 'var(--color-fg-dim, #666)' : '';
+				thumb.style.cursor = disabled ? 'default' : '';
+			});
+		}
+
+		// Store original slider values for when toggles are disabled
+		let savedHueValues = [colorConfig.minHue, colorConfig.maxHue];
+		let savedSatValues = [colorConfig.minSaturation, colorConfig.maxSaturation];
+		let savedLitValues = [colorConfig.minLightness, colorConfig.maxLightness];
+
+		// Update sliders to show site theme values when toggled on
+		function updateSlidersForSiteTheme() {
+			if (siteThemeHsl) {
+				if (siteHueInput?.checked) {
+					const spread = hueSpreadSlider.getValue();
+					const minHue = (siteThemeHsl.h - spread + 360) % 360;
+					const maxHue = (siteThemeHsl.h + spread) % 360;
+					hueSlider.setValues([minHue, maxHue]);
+				}
+				if (siteSaturationInput?.checked) {
+					satSlider.setValues([siteThemeHsl.s, siteThemeHsl.s]);
+				}
+				if (siteLightnessInput?.checked) {
+					litSlider.setValues([siteThemeHsl.l, siteThemeHsl.l]);
+				}
+			}
+			updateGradients();
+		}
+
+		[siteHueInput, siteSaturationInput, siteLightnessInput].forEach(el => {
+			if (!el) return;
+			el.addEventListener('change', () => {
+				updateToggle(el);
+
+				// Update slider states based on which toggle changed
+				if (el === siteHueInput) {
+					const isChecked = el.checked;
+					updateSliderState(hueSliderContainer, isChecked);
+					if (hueSpreadContainer) {
+						hueSpreadContainer.style.display = isChecked ? 'block' : 'none';
+					}
+					if (isChecked) {
+						// Save current values and show site theme hue range
+						savedHueValues = hueSlider.getValues();
+					} else {
+						// Restore saved values
+						hueSlider.setValues(savedHueValues);
+					}
+				} else if (el === siteSaturationInput) {
+					updateSliderState(satSliderContainer, el.checked);
+					if (el.checked) {
+						savedSatValues = satSlider.getValues();
+					} else {
+						satSlider.setValues(savedSatValues);
+					}
+				} else if (el === siteLightnessInput) {
+					updateSliderState(litSliderContainer, el.checked);
+					if (el.checked) {
+						savedLitValues = litSlider.getValues();
+					} else {
+						litSlider.setValues(savedLitValues);
+					}
+				}
+
+				updateSlidersForSiteTheme();
+				updatePreview();
+			});
+		});
+
+		// Set up hue spread change handler (defined earlier as empty, now assigned)
+		onHueSpreadChange = () => {
+			if (siteHueInput?.checked) {
+				updateSlidersForSiteTheme();
+			}
+			updatePreview();
+		};
+
+		// Initialize slider states if toggles are already on
+		if (siteHueInput?.checked) updateSliderState(hueSliderContainer, true);
+		if (siteSaturationInput?.checked) updateSliderState(satSliderContainer, true);
+		if (siteLightnessInput?.checked) updateSliderState(litSliderContainer, true);
+
+		// Initialize sliders to show site theme values if toggles are already on
+		updateSlidersForSiteTheme();
 		updatePreview();
 	}
 
@@ -1313,8 +1572,50 @@
 		});
 	}
 
-	// Initial colorization
-	colorizeAll();
+	// Fetch remote overrides if configured
+	function fetchOverrides() {
+		if (!OVERRIDES_URL) return Promise.resolve();
+
+		return new Promise((resolve) => {
+			// Use GM_xmlhttpRequest if available (bypasses CORS)
+			if (typeof GM_xmlhttpRequest !== 'undefined') {
+				GM_xmlhttpRequest({
+					method: 'GET',
+					url: OVERRIDES_URL,
+					onload: (response) => {
+						try {
+							const remoteOverrides = JSON.parse(response.responseText);
+							// Merge remote overrides (local MANUAL_OVERRIDES takes precedence)
+							MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
+							console.log('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
+						} catch (e) {
+							console.error('[Nick Colors] Failed to parse remote overrides:', e);
+						}
+						resolve();
+					},
+					onerror: (e) => {
+						console.error('[Nick Colors] Failed to fetch remote overrides:', e);
+						resolve();
+					}
+				});
+			} else {
+				// Fallback to fetch (may fail due to CORS)
+				fetch(OVERRIDES_URL)
+					.then(r => r.json())
+					.then(remoteOverrides => {
+						MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
+						console.log('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
+					})
+					.catch(e => console.error('[Nick Colors] Failed to fetch remote overrides:', e))
+					.finally(resolve);
+			}
+		});
+	}
+
+	// Initial colorization (after fetching overrides)
+	fetchOverrides().then(() => {
+		colorizeAll();
+	});
 
 	// Watch for new content
 	const observer = new MutationObserver((mutations) => {
