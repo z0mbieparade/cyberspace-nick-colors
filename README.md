@@ -5,8 +5,8 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 ## Installation
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/)
-2. Click here and GreaseMonkey or TaperMonkey should give you the option to install the script: [Install](https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js)
-3. Save and refresh cyberspace.online
+2. Click here and Greasemonkey or Tampermonkey should give you the option to install the script: [Install](https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js)
+3. Return to cyberspace.online and refresh.
 
 ## Usage
 
@@ -33,14 +33,24 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 - **Style variations** - Optionally vary font-weight, italic, and small-caps based on username hash
 - **Prepend icons** - Optionally prepend a hash-based icon from a customizable set to each username
 - **Per-user overrides** - Right-click any username to set custom color, icon, and style variations
+- **Import/Export** - Backup and restore your settings via file or clipboard
 
 ## Nick Style Override
 
-The script links to [overrides.json](/overrides.json), and loads any colors saved there. If you'd like a style applied site-wide for other users running the script to see, message me on [https://cyberspace.online/z0ylent](@z0ylent) and I'll update it.
+The script links to [overrides.json](/overrides.json), and loads any colors saved there. If you'd like a style applied site-wide for other users running the script to see, message me on [@z0ylent](https://cyberspace.online/z0ylent) and I'll update it.
 
 ## Site Theme Integration
 
 The script can read your custom theme settings and optionally match its hue range, saturation, or lightness.
+
+## Development
+
+```bash
+npm install
+node build.js [version] [--no-minify]
+```
+
+The source files are in `src/` and the build script concatenates and minifies them into the final userscript.
 
 ## Contributing
 
