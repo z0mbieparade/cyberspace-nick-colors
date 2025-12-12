@@ -40,6 +40,9 @@
 	// CONFIGURATION
 	// =====================================================
 
+	// Debug mode - set to true to show detailed calculation info in color picker
+	const DEBUG = true;
+
 	// URL to fetch manual overrides from (set to null to disable)
 	// Host your overrides.json on GitHub, Gist, or any CORS-friendly location
 	const OVERRIDES_URL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/overrides.json';
@@ -71,7 +74,7 @@
 		minHue: 0,           // starting hue (0 = red)
 		maxHue: 360,         // ending hue (360 = back to red)
 		excludeRanges: [],   // exclude hue ranges, e.g., [[40,70]] to skip muddy yellows
-		contrastThreshold: 0, // 0-50, add outline if lightness contrast below this (0 = disabled)
+		contrastThreshold: 50, // 0-50, add outline if lightness contrast below this (0 = disabled)
 	};
 
 	// Default style variation settings
@@ -141,36 +144,46 @@
 		return null;
 	}
 
-	// Clamp a hue value to the effective range
-	function clampHueToRange(hue, minHue, maxHue) {
-		// Handle wrap-around ranges (e.g., 300-60 wraps through 0)
+	// Map a hue value (0-360) to the effective range
+	// Scales input proportionally: 0 -> minHue, 360 -> maxHue
+	function mapHueToRange(hue, minHue, maxHue) {
+		// If full range, no mapping needed
+		if (minHue === 0 && maxHue === 360) return hue;
+
+		// Normalize input to 0-1
+		const t = hue / 360;
+
 		if (minHue <= maxHue) {
-			// Normal range, clamp to nearest boundary
-			if (hue >= minHue && hue <= maxHue) return hue;
-			// Find which boundary is closer
-			const distToMin = Math.min(Math.abs(hue - minHue), 360 - Math.abs(hue - minHue));
-			const distToMax = Math.min(Math.abs(hue - maxHue), 360 - Math.abs(hue - maxHue));
-			return distToMin < distToMax ? minHue : maxHue;
+			// Normal range: linearly map 0-360 to minHue-maxHue
+			return minHue + t * (maxHue - minHue);
 		} else {
-			// Wrap-around range (e.g., 300-60 means 300-360 and 0-60)
-			if (hue >= minHue || hue <= maxHue) return hue;
-			// Find which boundary is closer
-			const distToMin = Math.min(Math.abs(hue - minHue), 360 - Math.abs(hue - minHue));
-			const distToMax = Math.min(Math.abs(hue - maxHue), 360 - Math.abs(hue - maxHue));
-			return distToMin < distToMax ? minHue : maxHue;
+			// Wrap-around range (e.g., 300-60 means 300->360->0->60)
+			// Total range spans: (360 - minHue) + maxHue
+			const range = (360 - minHue) + maxHue;
+			const mapped = minHue + t * range;
+			// Wrap around if we go past 360
+			return mapped >= 360 ? mapped - 360 : mapped;
 		}
 	}
 
-	// Clamp a color to the effective config range
-	function clampColorToRange(color, effectiveConfig) {
+	// Map a value from 0-100 range proportionally to min-max range
+	function mapToRange(value, min, max) {
+		if (min === 0 && max === 100) return value;
+		const t = value / 100; // Normalize to 0-1
+		return min + t * (max - min);
+	}
+
+	// Map a color to the effective config range
+	// Uses proportional mapping: 0-360/0-100 input maps to the configured range
+	function mapColorToRange(color, effectiveConfig) {
 		const hsl = parseColorToHsl(color);
 		if (!hsl) return color; // Can't parse, return as-is
 
-		const clampedHue = clampHueToRange(hsl.h, effectiveConfig.minHue, effectiveConfig.maxHue);
-		const clampedSat = Math.max(effectiveConfig.minSaturation, Math.min(effectiveConfig.maxSaturation, hsl.s));
-		const clampedLit = Math.max(effectiveConfig.minLightness, Math.min(effectiveConfig.maxLightness, hsl.l));
+		const mappedHue = mapHueToRange(hsl.h, effectiveConfig.minHue, effectiveConfig.maxHue);
+		const mappedSat = mapToRange(hsl.s, effectiveConfig.minSaturation, effectiveConfig.maxSaturation);
+		const mappedLit = mapToRange(hsl.l, effectiveConfig.minLightness, effectiveConfig.maxLightness);
 
-		return `hsl(${clampedHue}, ${clampedSat}%, ${clampedLit}%)`;
+		return `hsl(${mappedHue}, ${mappedSat}%, ${mappedLit}%)`;
 	}
 
 	// Get background lightness from site theme or CSS variable
@@ -246,39 +259,39 @@
 		},
 		// Dark: fg #efe5c0 (warm cream, ~45° hue)
 		'Dark': {
-			color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// Light: fg #000 (black text on light bg - needs high contrast colors)
 		'Light': {
-			color: { minSaturation: 70, maxSaturation: 90, minLightness: 30, maxLightness: 45, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 70, maxSaturation: 90, minLightness: 30, maxLightness: 45, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// C64: fg white on blue bg #2a2ab8 - retro blue theme
 		'C64': {
-			color: { minSaturation: 70, maxSaturation: 90, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 280, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 70, maxSaturation: 90, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 280, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// VT320: fg #ff9a10 (orange, ~35° hue) - amber terminal
 		'VT320': {
-			color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 15, maxHue: 55, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 15, maxHue: 55, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// Matrix: fg rgba(160,224,68,.9) (green, ~85° hue) - green terminal
 		'Matrix': {
-			color: { minSaturation: 75, maxSaturation: 95, minLightness: 45, maxLightness: 60, minHue: 70, maxHue: 140, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 75, maxSaturation: 95, minLightness: 45, maxLightness: 60, minHue: 70, maxHue: 140, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// Poetry: fg #222 (dark text on light bg) - elegant minimal
 		'Poetry': {
-			color: { minSaturation: 40, maxSaturation: 60, minLightness: 30, maxLightness: 45, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 40, maxSaturation: 60, minLightness: 30, maxLightness: 45, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// Brutalist: fg #c0d0e8 (cool blue-gray, ~220° hue)
 		'Brutalist': {
-			color: { minSaturation: 50, maxSaturation: 70, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 260, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 50, maxSaturation: 70, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 260, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// GRiD: fg #fea813 (orange, ~40° hue) - warm amber
 		'GRiD': {
-			color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 20, maxHue: 60, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 20, maxHue: 60, excludeRanges: [], contrastThreshold: 50 }
 		},
 		// System: fg #efe5c0 (same as Dark)
 		'System': {
-			color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 0 }
+			color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
 		},
 	};
 
@@ -373,80 +386,153 @@
 		return config.excludeRanges.some(([min, max]) => hue >= min && hue <= max);
 	}
 
-	function generateStyles(username) {
-		let styles = {};
-		let lightness = null; // Track lightness for contrast check
-		const effectiveConfig = getEffectiveColorConfig();
+	// =====================================================
+	// COLOR GENERATION - CLEAN LOGIC
+	// =====================================================
+	//
+	// Flow:
+	// 1. getBaseColor(username) → raw HSL (0-360, 0-100, 0-100)
+	//    - From custom save, override, or hash generation
+	// 2. applyRangeMapping(hsl, config) → mapped HSL (within site ranges)
+	//    - Proportionally maps base color to configured ranges
+	// 3. Display always shows mapped result
+	// 4. Picker shows raw values, preview shows mapped result
+	// =====================================================
 
-		// Check user-saved overrides first (takes precedence over manual)
+	/**
+	 * Generate base (raw) HSL color for a username
+	 * Returns { h, s, l } in full range (h: 0-360, s: 0-100, l: 0-100)
+	 */
+	function getBaseColor(username) {
+		// Check user-saved custom color first
 		if (customNickColors[username]) {
 			const custom = customNickColors[username];
-			if (typeof custom === 'string') {
-				styles = { color: clampColorToRange(custom, effectiveConfig) };
-			} else {
-				styles = { ...custom };
-				// Clamp color to effective range (but preserve original in storage)
-				if (styles.color) {
-					styles.color = clampColorToRange(styles.color, effectiveConfig);
-				}
+			const colorStr = typeof custom === 'string' ? custom : custom.color;
+			if (colorStr) {
+				const hsl = parseColorToHsl(colorStr);
+				if (hsl) return hsl;
 			}
 		}
-		// Then check hardcoded manual overrides
-		else if (MANUAL_OVERRIDES[username]) {
+
+		// Check remote/manual overrides
+		if (MANUAL_OVERRIDES[username]) {
 			const override = MANUAL_OVERRIDES[username];
-			if (typeof override === 'string') {
-				styles = { color: clampColorToRange(override, effectiveConfig) };
-			} else {
-				styles = { ...override };
-				if (styles.color) {
-					styles.color = clampColorToRange(styles.color, effectiveConfig);
+			const colorStr = typeof override === 'string' ? override : override.color;
+			if (colorStr) {
+				const hsl = parseColorToHsl(colorStr);
+				if (hsl) return hsl;
+			}
+		}
+
+		// Generate from hash - full range
+		const hash = hashString(username);
+		const hash2 = hashString(username + '_sat');
+		const hash3 = hashString(username + '_lit');
+
+		return {
+			h: hash % 360,
+			s: hash2 % 101,  // 0-100 inclusive
+			l: hash3 % 101   // 0-100 inclusive
+		};
+	}
+
+	/**
+	 * Apply site-wide range mapping to a base color
+	 * Maps proportionally: input 0-360/0-100 → configured min-max range
+	 */
+	function applyRangeMapping(hsl, config) {
+		return {
+			h: mapHueToRange(hsl.h, config.minHue, config.maxHue),
+			s: mapToRange(hsl.s, config.minSaturation, config.maxSaturation),
+			l: mapToRange(hsl.l, config.minLightness, config.maxLightness)
+		};
+	}
+
+	/**
+	 * Get raw styles for editing in color picker
+	 * Returns the base color values that user can edit
+	 */
+	function getRawStylesForPicker(username) {
+		const base = getBaseColor(username);
+
+		// Build styles object with base color
+		let styles = { color: `hsl(${base.h}, ${base.s}%, ${base.l}%)` };
+
+		// Copy non-color properties from custom save
+		if (customNickColors[username] && typeof customNickColors[username] === 'object') {
+			const custom = { ...customNickColors[username] };
+			delete custom.color;
+			delete custom.invert;
+			styles = { ...styles, ...custom };
+		} else if (MANUAL_OVERRIDES[username] && typeof MANUAL_OVERRIDES[username] === 'object') {
+			const override = { ...MANUAL_OVERRIDES[username] };
+			delete override.color;
+			styles = { ...styles, ...override };
+		}
+
+		return styles;
+	}
+
+	function generateStyles(username) {
+		let styles = {};
+		const effectiveConfig = getEffectiveColorConfig();
+
+		// Get per-user invert setting (true, false, or undefined for auto)
+		const userInvertSetting = customNickColors[username]?.invert;
+
+		// Get base color and apply site-wide range mapping
+		const baseColor = getBaseColor(username);
+		const mappedColor = applyRangeMapping(baseColor, effectiveConfig);
+
+		// Handle hue exclusion by shifting
+		let finalHue = mappedColor.h;
+		let attempts = 0;
+		while (isHueExcluded(finalHue, effectiveConfig) && attempts < 36) {
+			finalHue = (finalHue + 10) % 360;
+			attempts++;
+		}
+
+		// Set the display color
+		styles.color = `hsl(${finalHue}, ${mappedColor.s}%, ${mappedColor.l}%)`;
+
+		// Copy non-color properties from custom save or override
+		if (customNickColors[username] && typeof customNickColors[username] === 'object') {
+			const custom = { ...customNickColors[username] };
+			delete custom.color;
+			delete custom.invert;
+			styles = { ...styles, ...custom };
+		} else if (MANUAL_OVERRIDES[username] && typeof MANUAL_OVERRIDES[username] === 'object') {
+			const override = { ...MANUAL_OVERRIDES[username] };
+			delete override.color;
+			styles = { ...styles, ...override };
+		}
+
+		// Handle inversion based on per-user setting or auto contrast
+		let shouldInvert = false;
+		if (userInvertSetting === true) {
+			// User explicitly enabled inversion
+			shouldInvert = true;
+		} else if (userInvertSetting === false) {
+			// User explicitly disabled inversion
+			shouldInvert = false;
+		} else {
+			// Auto: check contrast threshold
+			const threshold = effectiveConfig.contrastThreshold || 0;
+			if (threshold > 0 && styles.color && !styles.backgroundColor) {
+				const hsl = parseColorToHsl(styles.color);
+				if (hsl) {
+					const bgLightness = getBackgroundLightness();
+					const contrast = Math.abs(hsl.l - bgLightness);
+					shouldInvert = contrast < threshold;
 				}
 			}
 		}
-		// Generate from hash
-		else {
-			// Generate from hash - use different parts of the hash for each property
-			const hash = hashString(username);
-			const hash2 = hashString(username + '_sat');
-			const hash3 = hashString(username + '_lit');
 
-			// Hue range (with wrap-around support)
-			let hueRange = effectiveConfig.maxHue - effectiveConfig.minHue;
-			if (hueRange <= 0) hueRange += 360;
-			let hue = effectiveConfig.minHue + (hash % hueRange);
-			if (hue >= 360) hue -= 360;
-
-			// Avoid excluded ranges by shifting
-			let attempts = 0;
-			while (isHueExcluded(hue, effectiveConfig) && attempts < 36) {
-				hue = (hue + 10) % 360;
-				attempts++;
-			}
-
-			// Saturation range
-			const satRange = effectiveConfig.maxSaturation - effectiveConfig.minSaturation;
-			const saturation = effectiveConfig.minSaturation + (hash2 % Math.max(1, satRange + 1));
-
-			// Lightness range
-			const litRange = effectiveConfig.maxLightness - effectiveConfig.minLightness;
-			lightness = effectiveConfig.minLightness + (hash3 % Math.max(1, litRange + 1));
-
-			styles = {
-				color: `hsl(${hue}, ${saturation}%, ${lightness}%)`
-			};
-
-			// Invert colors if contrast is below threshold
-			const threshold = effectiveConfig.contrastThreshold || 0;
-			if (threshold > 0) {
-				const bgLightness = getBackgroundLightness();
-				const contrast = Math.abs(lightness - bgLightness);
-				if (contrast < threshold) {
-					// Swap: color becomes background, use page background as text
-					styles.backgroundColor = styles.color;
-					styles.color = 'var(--color-bg, #000)';
-					styles.padding = '0 0.25em';
-				}
-			}
+		if (shouldInvert && styles.color && !styles.backgroundColor) {
+			// Swap: color becomes background, use page background as text
+			styles.backgroundColor = styles.color;
+			styles.color = 'var(--color-bg, #000)';
+			styles.padding = '0 0.25em';
 		}
 
 		// Apply style variations based on hash (unless already set by override)
@@ -697,6 +783,8 @@
 					if (!node.textContent.includes('@')) return NodeFilter.FILTER_REJECT;
 					if (node.parentElement?.closest('[data-mention-colored]')) return NodeFilter.FILTER_REJECT;
 					if (node.parentElement?.closest('[data-nick-colored]')) return NodeFilter.FILTER_REJECT;
+					// Skip dialog previews (they manage their own styling)
+					if (node.parentElement?.closest('.nc-dialog-preview')) return NodeFilter.FILTER_REJECT;
 					// Skip script/style tags
 					const tagName = node.parentElement?.tagName;
 					if (tagName === 'SCRIPT' || tagName === 'STYLE' || tagName === 'TEXTAREA' || tagName === 'INPUT') {
@@ -816,16 +904,39 @@
 			background: var(--color-code-bg, #444);
 			box-sizing: border-box;
 		}
+		/* Mapped track hidden by default */
+		.nc-slider-track-mapped {
+			display: none;
+		}
+		/* Split track for showing mapped vs full range - taller with gap */
+		.nc-slider.nc-slider-split { height: 34px; }
+		.nc-slider.nc-slider-split .nc-slider-track {
+			top: calc(50% + 1px);
+			bottom: 4px;
+		}
+		.nc-slider.nc-slider-split .nc-slider-track-mapped {
+			display: block;
+			position: absolute;
+			top: 4px;
+			bottom: calc(50% + 1px);
+			left: 0;
+			right: 0;
+			border: 1px solid var(--color-border, #333);
+			background: var(--color-code-bg, #444);
+			box-sizing: border-box;
+		}
 		.nc-slider-thumb {
 			position: absolute; top: 0; width: 14px; height: 22px;
 			background: var(--color-fg, #fff);
-			border: 1px solid var(--color-border, #333);
+			border: 2px solid var(--color-bg, #000);
+			outline: 1px solid var(--color-border, #333);
 			cursor: ew-resize; transform: translateX(-50%); z-index: 2;
 			display: flex; align-items: center; justify-content: center;
 			font-size: 8px;
 			color: var(--color-bg, #000); user-select: none;
+			box-sizing: border-box;
 		}
-		.nc-slider-thumb:hover { background: var(--color-fg-dim, #ccc); }
+		.nc-slider.nc-slider-split .nc-slider-thumb { height: 32px; }
 		.nc-slider-labels {
 			display: flex; justify-content: space-between; margin-top: 2px;
 			font-size: 0.625rem; color: var(--color-fg-dim, #888);
@@ -862,6 +973,7 @@
 		container.innerHTML = `
 			${label ? `<label style="display:block;margin:0.5rem 0 0.25rem;font-size:0.75rem;color:var(--color-fg-dim,#888)">${label}</label>` : ''}
 			<div class="nc-slider${simple ? ' nc-slider-simple' : ''}">
+				<div class="nc-slider-track-mapped"></div>
 				<div class="nc-slider-track"></div>
 				${isRange ? '<div class="nc-slider-thumb" data-i="0">▶</div><div class="nc-slider-thumb" data-i="1">◀</div>'
 						 : '<div class="nc-slider-thumb" data-i="0"></div>'}
@@ -870,6 +982,7 @@
 		`;
 
 		const track = container.querySelector('.nc-slider-track');
+		const trackMapped = container.querySelector('.nc-slider-track-mapped');
 		const thumbs = container.querySelectorAll('.nc-slider-thumb');
 		const labels = container.querySelectorAll('.nc-slider-labels span');
 		const slider = container.querySelector('.nc-slider');
@@ -1013,6 +1126,40 @@
 			onChange?.(isRange ? [...values] : values[0]);
 		});
 
+		// Helper to build gradient string from stops
+		function buildGradientString(stops) {
+			return `linear-gradient(to right, ${stops.map(stop => {
+				const [hue, s, l, a = 1, p = null] = stop;
+				let colorString = `hsla(${hue}, ${s}%, ${l}%, ${a})`;
+				if (p !== null) colorString += ` ${p}%`;
+				return colorString;
+			}).join(', ')})`;
+		}
+
+		// Set split gradient: top track shows mapped range, bottom shows full range
+		function setSplitGradient(mappedStops, fullStops) {
+			if (!mappedStops) {
+				// Disable split mode
+				slider.classList.remove('nc-slider-split');
+				trackMapped.style.background = '';
+				return;
+			}
+			// Enable split mode
+			slider.classList.add('nc-slider-split');
+			trackMapped.style.background = buildGradientString(mappedStops);
+			track.style.background = buildGradientString(fullStops);
+		}
+
+		// Set thumb color(s) - accepts single color or array for range sliders
+		function setThumbColor(colors) {
+			const colorArray = Array.isArray(colors) ? colors : [colors];
+			thumbs.forEach((t, i) => {
+				if (colorArray[i]) {
+					t.style.background = colorArray[i];
+				}
+			});
+		}
+
 		if (opts.gradient) setGradient(opts.gradient);
 		update();
 
@@ -1022,7 +1169,9 @@
 			getValues: () => [...values],
 			setValue: (v) => { values[0] = v; update(); },
 			setValues: (vs) => { values = [...vs]; update(); },
-			setGradient
+			setGradient,
+			setSplitGradient,
+			setThumbColor
 		};
 	}
 
@@ -1077,8 +1226,9 @@
 			display: flex; 
 			gap: 0.5rem; 
 			flex-wrap: wrap; 
+			justify-content: space-around;
 		}
-		.nc-dialog .preview-nick { padding: 0.125rem 0.25rem; }
+		.nc-dialog .preview-nick { padding: 0.125rem 0.25rem !important; }
 		.nc-dialog-footer {
 			padding: 0.5rem 1rem .5rem; 
 			border-top: 1px solid var(--color-border, #333);
@@ -1174,8 +1324,138 @@
 		.nc-dialog .nc-dialog-attribution a {
 			color: var(--color-fg-dim, #666); text-decoration: none;
 		}
+		.nc-dialog pre 
+		{
+			white-space: pre-wrap;
+			word-wrap: break-word;
+			overflow-wrap: break-word;
+			max-width: 100%;
+			background-color: var(--color-code-bg, #222);
+			color: var(--color-fg, #fff);
+			padding: 0.5rem;
+		}
+		.nc-dialog pre.nc-dialog-debug 
+		{
+			border: 2px dashed var(--color-border, #333);
+		}
 	`;
 	document.head.appendChild(dialogStyles);
+
+	// =====================================================
+	// INPUT ROW HELPER FUNCTIONS
+	// =====================================================
+
+	/**
+	 * Creates a stacked input row (label on top, input below)
+	 * @param {Object} opts - { label, id, type, value, placeholder, hint, classes }
+	 * @returns {string} HTML string
+	 */
+	function createInputRow(opts) {
+		const { label, id, type = 'text', value = '', placeholder = '', hint = '', classes = '' } = opts;
+		const classStr = `nc-input-row-stacked${classes ? ' ' + classes : ''}`;
+
+		let inputHtml;
+		if (type === 'textarea') {
+			inputHtml = `<textarea id="${id}" placeholder="${placeholder}">${value}</textarea>`;
+		} else if (type === 'select' && opts.options) {
+			inputHtml = `<select id="${id}">${opts.options}</select>`;
+		} else {
+			inputHtml = `<input type="${type}" id="${id}" value="${value}" placeholder="${placeholder}">`;
+		}
+
+		return `
+			<div class="${classStr}">
+				<label for="${id}">${label}</label>
+				${inputHtml}
+				${hint ? `<div class="hint">${hint}</div>` : ''}
+			</div>
+		`;
+	}
+
+	/**
+	 * Creates a toggle row (label and toggle side by side)
+	 * @param {Object} opts - { label, id, checked, disabled, classes }
+	 * @returns {string} HTML string
+	 */
+	function createToggleRow(opts) {
+		const { label, id, checked = false, disabled = false, classes = '' } = opts;
+		const classStr = `nc-input-row flex items-center justify-between gap-4 nc-toggle${classes ? ' ' + classes : ''}`;
+
+		return `
+			<div class="${classStr}">
+				<label class="text-fg text-sm">${label}</label>
+				<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+					<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${checked ? 'true' : 'false'}</div>
+					<input type="checkbox" id="${id}" class="sr-only" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+					<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${checked ? 'bg-fg' : 'bg-fg-dim'}">
+						<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${checked ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+					</div>
+				</label>
+			</div>
+		`;
+	}
+
+	/**
+	 * Creates a debug pre element (only shown when DEBUG is true)
+	 * @param {Object|string} data - Object with label/value pairs, or plain string for unlabeled content
+	 * @param {string} [classes] - Additional CSS classes
+	 * @returns {string} HTML string (empty if DEBUG is false)
+	 */
+	function createDebugPre(data, classes = '') {
+		if (!DEBUG) return '';
+		const classStr = `nc-dialog-debug${classes ? ' ' + classes : ''}`;
+		if (typeof data === 'string') {
+			return `<pre class="${classStr}">${data}</pre>`;
+		}
+		const lines = Object.entries(data)
+			.map(([label, value]) => `<strong>${label}:</strong> ${value ?? 'N/A'}`)
+			.join('\n');
+		return `<pre class="${classStr}">\n${lines}\n</pre>`;
+	}
+
+	/**
+	 * Gets or creates a debug pre element under a parent (for dynamic updates)
+	 * @param {HTMLElement} parent - Parent element to append to
+	 * @param {string} [classes] - Additional CSS classes
+	 * @returns {HTMLElement|null} The debug element, or null if DEBUG is false
+	 */
+	function getOrCreateDebugPre(parent, classes = '') {
+		if (!DEBUG) return null;
+		let debug = parent.querySelector('.nc-dynamic-debug');
+		if (!debug) {
+			debug = document.createElement('pre');
+			debug.className = `nc-dynamic-debug nc-dialog-debug${classes ? ' ' + classes : ''}`;
+			parent.appendChild(debug);
+		}
+		return debug;
+	}
+
+	/**
+	 * Creates a tri-state toggle row (auto/true/false)
+	 * @param {Object} opts - { label, id, state (null=auto, true, false), defaultLabel, classes }
+	 * @returns {string} HTML string
+	 */
+	function createTriStateToggleRow(opts) {
+		const { label, id, state = null, defaultLabel = '', classes = '' } = opts;
+		const classStr = `nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle${classes ? ' ' + classes : ''}`;
+
+		const stateText = state === true ? 'true' : state === false ? 'false' : 'auto';
+		const isChecked = state === true;
+		const thumbPosition = state === true ? '1.25rem' : state === false ? '0.125rem' : '0.625rem';
+
+		return `
+			<div class="${classStr}">
+				<label class="text-fg text-sm">${label}${defaultLabel ? ` <span class="text-fg-dim">(default: ${defaultLabel})</span>` : ''}</label>
+				<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+					<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${stateText}</div>
+					<input type="checkbox" id="${id}" class="sr-only" ${isChecked ? 'checked' : ''}>
+					<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${isChecked ? 'bg-fg' : 'bg-fg-dim'}">
+						<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${thumbPosition})"></div>
+					</div>
+				</label>
+			</div>
+		`;
+	}
 
 	/**
 	 * Creates a dialog with standard structure
@@ -1261,7 +1541,7 @@
 
 	function createColorPicker(username, currentStyles) {
 		// Filter out color, icon, and style variation properties from CSS string
-		const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant'];
+		const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'invert'];
 		const filteredStyles = Object.fromEntries(
 			Object.entries(currentStyles).filter(([key]) => !styleVariationKeys.includes(key))
 		);
@@ -1286,6 +1566,7 @@
 		const currentWeight = savedStyles.fontWeight;
 		const currentItalic = savedStyles.fontStyle;
 		const currentCase = savedStyles.fontVariant;
+		const currentInvert = savedStyles.invert; // true, false, or undefined (auto)
 
 		// Check if user has remote overrides
 		const hasRemoteOverride = MANUAL_OVERRIDES[username];
@@ -1299,39 +1580,66 @@
 			}
 		}
 
-		// Check if color range is clamped
+		// Check if color range is restricted
 		const eff = getEffectiveColorConfig();
-		const isHueClamped = eff.minHue !== 0 || eff.maxHue !== 360;
-		const isSatClamped = eff.minSaturation !== 0 || eff.maxSaturation !== 100;
-		const isLitClamped = eff.minLightness !== 0 || eff.maxLightness !== 100;
-		const isClamped = isHueClamped || isSatClamped || isLitClamped;
+		const isHueRestricted = eff.minHue !== 0 || eff.maxHue !== 360;
+		const isSatRestricted = eff.minSaturation !== 0 || eff.maxSaturation !== 100;
+		const isLitRestricted = eff.minLightness !== 0 || eff.maxLightness !== 100;
+		const isRestricted = isHueRestricted || isSatRestricted || isLitRestricted;
+
+		// Determine source of color data for debug display
+		const baseColor = getBaseColor(username);
+		const mappedColor = applyRangeMapping(baseColor, eff);
+		let colorSource = 'hash-generated';
+		let colorSourceData = '';
+		if (customNickColors[username]) {
+			colorSource = 'customNickColors (local save)';
+			colorSourceData = JSON.stringify(customNickColors[username]);
+		} else if (MANUAL_OVERRIDES[username]) {
+			colorSource = 'MANUAL_OVERRIDES (remote)';
+			colorSourceData = JSON.stringify(MANUAL_OVERRIDES[username]);
+		}
+
+		// Get hash values for debug
+		const hash = hashString(username);
+		const hash2 = hashString(username + '_sat');
+		const hash3 = hashString(username + '_lit');
+		const hash4 = hashString(username + '_style');
 
 		const dialog = createDialog({
 			title: `Nick: ${username}`,
 			width: '320px',
 			onSettings: () => createSettingsPanel(),
-			preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message<br />Inline mention @${username} example</div>`,
+			preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message<br />Inline mention <span id="picker-preview-mention">@${username}</span> example</div>`,
 			content: `
+				${createDebugPre({
+					'Color Source': colorSource,
+					'Saved Data': colorSourceData,
+					'Hash Values': `h:${hash} s:${hash2} l:${hash3} style:${hash4}`,
+					'Base Color (raw)': `H:${baseColor.h.toFixed(1)} S:${baseColor.s.toFixed(1)} L:${baseColor.l.toFixed(1)}`,
+					'Mapped Color': `H:${mappedColor.h.toFixed(1)} S:${mappedColor.s.toFixed(1)} L:${mappedColor.l.toFixed(1)}`,
+					'Effective Config': `H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`,
+					'Style Variations': `weight:${hashWeight} italic:${hashItalic} case:${hashCase}`
+				})}
 				${hasRemoteOverride ? `<div class="hint" style="margin-bottom: 0.5rem;">Site-wide override: <code style="background: var(--color-code-bg, #222); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
 				<h4>Nick Color</h4>
 				<div id="picker-sliders"></div>
-				<div class="nc-input-row-stacked no-padding-bottom">
-					<label>Custom color value:</label>
-					<input type="text" id="picker-custom" placeholder="#ff6b6b or hsl(280, 90%, 65%)">
-				</div>
-				${isClamped ? `<div class="hint" style="margin-top: 0.5rem;">Color range is restricted. Preview shows clamped result. Click SETTINGS to adjust.</div>` : ''}
+				${createInputRow({
+					label: 'Custom color value:',
+					id: 'picker-custom',
+					placeholder: '#ff6b6b or hsl(280, 90%, 65%)',
+					classes: 'no-padding-bottom'
+				})}
+				${isRestricted ? `<div class="hint" style="margin-top: 0.5rem;">Color range is restricted. Preview shows mapped result. Click SETTINGS to adjust.</div>` : ''}
 				<hr />
 				<h4>Custom Icon</h4>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
-					<label class="text-fg text-sm">Custom icon ${hashIcon ? `<span class="text-fg-dim">(default: ${hashIcon})</span>` : ''}</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${initialIconState === true ? 'true' : initialIconState === false ? 'false' : 'auto'}</div>
-						<input type="checkbox" id="picker-icon-enabled" class="sr-only" ${initialIconState === true ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${initialIconState === true ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${initialIconState === true ? '1.25rem' : initialIconState === false ? '0.125rem' : '0.625rem'})"></div>
-						</div>
-					</label>
-				</div>
+				${createTriStateToggleRow({
+					label: 'Custom icon',
+					id: 'picker-icon-enabled',
+					state: initialIconState,
+					defaultLabel: hashIcon,
+					classes: 'no-padding-top'
+				})}
 				<div class="nc-input-row-stacked no-padding-top" id="picker-icon-container" style="display: ${initialIconState === true ? 'block' : 'none'}">
 					${styleConfig.iconSet ? `<div id="picker-icon-options" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: 3px; transition: background 0.15s, border-color 0.15s;" title="Click to copy">${icon}</span>`).join('')}</div>` : ''}
 					<input type="text" id="picker-icon" value="${currentIcon}" placeholder="click above or enter your own">
@@ -1340,42 +1648,45 @@
 				<hr />
 				<h4>Style Variations</h4>
 				<div class="hint" style="margin-bottom: 0.5rem;">Override the global style settings for this user</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
-					<label class="text-fg text-sm">Bold <span class="text-fg-dim">(default: ${hashWeight})</span></label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${currentWeight === 'bold' ? 'true' : currentWeight === 'normal' ? 'false' : 'auto'}</div>
-						<input type="checkbox" id="picker-weight" class="sr-only" ${currentWeight === 'bold' ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${currentWeight === 'bold' ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${currentWeight === 'bold' ? '1.25rem' : currentWeight === 'normal' ? '0.125rem' : '0.625rem'})"></div>
-						</div>
-					</label>
-				</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
-					<label class="text-fg text-sm">Italic <span class="text-fg-dim">(default: ${hashItalic})</span></label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${currentItalic === 'italic' ? 'true' : currentItalic === 'normal' ? 'false' : 'auto'}</div>
-						<input type="checkbox" id="picker-italic" class="sr-only" ${currentItalic === 'italic' ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${currentItalic === 'italic' ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${currentItalic === 'italic' ? '1.25rem' : currentItalic === 'normal' ? '0.125rem' : '0.625rem'})"></div>
-						</div>
-					</label>
-				</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
-					<label class="text-fg text-sm">Small Caps <span class="text-fg-dim">(default: ${hashCase})</span></label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${currentCase === 'small-caps' ? 'true' : currentCase === 'normal' ? 'false' : 'auto'}</div>
-						<input type="checkbox" id="picker-case" class="sr-only" ${currentCase === 'small-caps' ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${currentCase === 'small-caps' ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${currentCase === 'small-caps' ? '1.25rem' : currentCase === 'normal' ? '0.125rem' : '0.625rem'})"></div>
-						</div>
-					</label>
-				</div>
+				${createTriStateToggleRow({
+					label: 'Bold',
+					id: 'picker-weight',
+					state: currentWeight === 'bold' ? true : currentWeight === 'normal' ? false : null,
+					defaultLabel: hashWeight,
+					classes: 'no-padding-top'
+				})}
+				${createTriStateToggleRow({
+					label: 'Italic',
+					id: 'picker-italic',
+					state: currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null,
+					defaultLabel: hashItalic,
+					classes: 'no-padding-top'
+				})}
+				${createTriStateToggleRow({
+					label: 'Small Caps',
+					id: 'picker-case',
+					state: currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null,
+					defaultLabel: hashCase,
+					classes: 'no-padding-top'
+				})}
+				${createTriStateToggleRow({
+					label: 'Invert',
+					id: 'picker-invert',
+					state: currentInvert,
+					defaultLabel: 'auto',
+					classes: 'no-padding-top'
+				})}
 				<hr />
 				<h4>Additional CSS</h4>
-				<div class="nc-input-row-stacked no-padding-top">
-					<textarea id="picker-css" placeholder="background-color: #1a1a2e;&#10;text-decoration: underline;">${currentCssString}</textarea>
-					<div class="hint">CSS properties, one per line</div>
-				</div>
+				${createInputRow({
+					label: '',
+					id: 'picker-css',
+					type: 'textarea',
+					value: currentCssString,
+					placeholder: 'background-color: #1a1a2e;&#10;text-decoration: underline;',
+					hint: 'CSS properties, one per line',
+					classes: 'no-padding-top'
+				})}
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
@@ -1402,6 +1713,9 @@
 					if (caseState !== null) {
 						styles.fontVariant = caseState ? 'small-caps' : 'normal';
 					}
+					if (invertState !== null) {
+						styles.invert = invertState;
+					}
 					customNickColors[username] = styles;
 					saveCustomNickColors();
 					refreshAllColors();
@@ -1418,6 +1732,7 @@
 		});
 
 		const preview = dialog.querySelector('#picker-preview');
+		const previewMention = dialog.querySelector('#picker-preview-mention');
 		const customInput = dialog.querySelector('#picker-custom');
 		const iconEnabledInput = dialog.querySelector('#picker-icon-enabled');
 		const iconContainer = dialog.querySelector('#picker-icon-container');
@@ -1425,6 +1740,7 @@
 		const weightInput = dialog.querySelector('#picker-weight');
 		const italicInput = dialog.querySelector('#picker-italic');
 		const caseInput = dialog.querySelector('#picker-case');
+		const invertInput = dialog.querySelector('#picker-invert');
 		const cssInput = dialog.querySelector('#picker-css');
 		const slidersContainer = dialog.querySelector('#picker-sliders');
 
@@ -1433,6 +1749,7 @@
 		let weightState = currentWeight === 'bold' ? true : currentWeight === 'normal' ? false : null;
 		let italicState = currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null;
 		let caseState = currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null;
+		let invertState = currentInvert === true ? true : currentInvert === false ? false : null;
 
 		// Parse CSS text into style object
 		function parseCssText(cssText) {
@@ -1452,38 +1769,130 @@
 			return styles;
 		}
 
-		// Create sliders
-		const hueSlider = createSlider({ label: 'Hue (0-360)', min: 0, max: 360, value: 180, onChange: () => { customInput.value = ''; updatePreview(); } });
-		const satSlider = createSlider({ label: 'Saturation (0-100)', min: 0, max: 100, value: 85, onChange: () => { customInput.value = ''; updatePreview(); } });
-		const litSlider = createSlider({ label: 'Lightness (0-100)', min: 0, max: 100, value: 65, onChange: () => { customInput.value = ''; updatePreview(); } });
+		// Create sliders with restricted range info and live value display in labels
+		const hueLabel = isHueRestricted
+			? `Hue <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span> <span style="color:var(--color-fg-dim,#888);font-size:0.65rem">→ mapped to ${eff.minHue}-${eff.maxHue}</span>`
+			: `Hue <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span>`;
+		const satLabel = isSatRestricted
+			? `Sat <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span> <span style="color:var(--color-fg-dim,#888);font-size:0.65rem">→ mapped to ${eff.minSaturation}-${eff.maxSaturation}</span>`
+			: `Sat <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span>`;
+		const litLabel = isLitRestricted
+			? `Lit <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span> <span style="color:var(--color-fg-dim,#888);font-size:0.65rem">→ mapped to ${eff.minLightness}-${eff.maxLightness}</span>`
+			: `Lit <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span>`;
+
+		const hueSlider = createSlider({ label: hueLabel, min: 0, max: 360, value: 180, onChange: () => { customInput.value = ''; updatePreview(); } });
+		const satSlider = createSlider({ label: satLabel, min: 0, max: 100, value: 85, onChange: () => { customInput.value = ''; updatePreview(); } });
+		const litSlider = createSlider({ label: litLabel, min: 0, max: 100, value: 65, onChange: () => { customInput.value = ''; updatePreview(); } });
 
 		slidersContainer.append(hueSlider.el, satSlider.el, litSlider.el);
 
 		function getTextColor() {
+			// Save raw slider values - mapping happens on display
 			return customInput.value.trim() || `hsl(${hueSlider.getValue()}, ${satSlider.getValue()}%, ${litSlider.getValue()}%)`;
 		}
 
 		function updateGradients() {
+			// Raw slider values (base values)
 			const h = hueSlider.getValue(), s = satSlider.getValue(), l = litSlider.getValue();
-			const hueStops = Array.from({ length: 13 }, (_, i) => {
+
+			// Apply site-wide range mapping (proportional)
+			const mappedH = mapHueToRange(h, eff.minHue, eff.maxHue);
+			const mappedS = mapToRange(s, eff.minSaturation, eff.maxSaturation);
+			const mappedL = mapToRange(l, eff.minLightness, eff.maxLightness);
+
+			// HUE SLIDER
+			// Full track: shows raw hue values with raw sat/lit (what you'd get without mapping)
+			const fullHueStops = Array.from({ length: 13 }, (_, i) => {
 				const hue = i * 30;
 				return [hue, s, l, 1, (hue / 360) * 100];
-				//return `hsl(${hue}, ${s}%, ${l}%) ${(hue / 360) * 100}%`;
 			});
-			hueSlider.setGradient(hueStops); //`linear-gradient(to right, ${hueStops})`);
-			satSlider.setGradient([[h, 0, l, 1, 0], [h, 100, l, 1, 100]]); //`linear-gradient(to right, hsl(${h}, 0%, ${l}%), hsl(${h}, 100%, ${l}%))`);
-			litSlider.setGradient([[h, s, 0, 1, 0], [h, s, 50, 1, 50], [h, s, 100, 1, 100]]); //`linear-gradient(to right, hsl(${h}, ${s}%, 0%), hsl(${h}, ${s}%, 50%), hsl(${h}, ${s}%, 100%))`);
+
+			if (isHueRestricted) {
+				// Mapped track: shows what color you GET at each position (mapped hue, mapped sat/lit)
+				const mappedHueStops = [];
+				for (let i = 0; i <= 36; i++) {
+					const inputHue = i * 10;
+					const outputHue = mapHueToRange(inputHue, eff.minHue, eff.maxHue);
+					const pos = (inputHue / 360) * 100;
+					mappedHueStops.push([outputHue, mappedS, mappedL, 1, pos]);
+				}
+				hueSlider.setSplitGradient(mappedHueStops, fullHueStops);
+			} else {
+				hueSlider.setSplitGradient(null);
+				hueSlider.setGradient(fullHueStops);
+			}
+
+			// SATURATION SLIDER
+			// Full track: shows raw sat values with raw hue/lit
+			const fullSatStops = [[h, 0, l, 1, 0], [h, 100, l, 1, 100]];
+
+			if (isSatRestricted) {
+				// Mapped track: shows actual output (mapped hue, mapped sat, mapped lit)
+				// Map 0-100 to minSat-maxSat
+				const mappedSatStops = [[mappedH, eff.minSaturation, mappedL, 1, 0], [mappedH, eff.maxSaturation, mappedL, 1, 100]];
+				satSlider.setSplitGradient(mappedSatStops, fullSatStops);
+			} else {
+				satSlider.setSplitGradient(null);
+				satSlider.setGradient(fullSatStops);
+			}
+
+			// LIGHTNESS SLIDER
+			// Full track: shows raw lit values with raw hue/sat
+			const fullLitStops = [[h, s, 0, 1, 0], [h, s, 50, 1, 50], [h, s, 100, 1, 100]];
+
+			if (isLitRestricted) {
+				// Mapped track: shows actual output (mapped hue/sat, mapped lit)
+				// Map 0-100 to minLit-maxLit
+				const mappedLitStops = [[mappedH, mappedS, eff.minLightness, 1, 0], [mappedH, mappedS, eff.maxLightness, 1, 100]];
+				litSlider.setSplitGradient(mappedLitStops, fullLitStops);
+			} else {
+				litSlider.setSplitGradient(null);
+				litSlider.setGradient(fullLitStops);
+			}
+
+			// All thumbs show the final resulting color
+			const thumbColor = `hsl(${mappedH}, ${mappedS}%, ${mappedL}%)`;
+			hueSlider.setThumbColor(thumbColor);
+			satSlider.setThumbColor(thumbColor);
+			litSlider.setThumbColor(thumbColor);
+
+			// Update live value displays: raw → mapped
+			const hueValuesEl = hueSlider.el.querySelector('.nc-slider-values');
+			const satValuesEl = satSlider.el.querySelector('.nc-slider-values');
+			const litValuesEl = litSlider.el.querySelector('.nc-slider-values');
+			if (hueValuesEl) hueValuesEl.textContent = `[${Math.round(h)} → ${Math.round(mappedH)}]`;
+			if (satValuesEl) satValuesEl.textContent = `[${Math.round(s)} → ${Math.round(mappedS)}]`;
+			if (litValuesEl) litValuesEl.textContent = `[${Math.round(l)} → ${Math.round(mappedL)}]`;
+
+			// Debug info under each slider
+			const hueDebug = getOrCreateDebugPre(hueSlider.el);
+			const satDebug = getOrCreateDebugPre(satSlider.el);
+			const litDebug = getOrCreateDebugPre(litSlider.el);
+
+			if (hueDebug) {
+				const hueRange = eff.maxHue - eff.minHue;
+				const hueT = h / 360;
+				hueDebug.textContent = `t=${hueT.toFixed(3)} | ${eff.minHue} + ${hueT.toFixed(3)} * (${eff.maxHue} - ${eff.minHue}) = ${eff.minHue} + ${hueT.toFixed(3)} * ${hueRange} = ${(eff.minHue + hueT * hueRange).toFixed(1)}`;
+			}
+			if (satDebug) {
+				const satRange = eff.maxSaturation - eff.minSaturation;
+				const satT = s / 100;
+				satDebug.textContent = `t=${satT.toFixed(3)} | ${eff.minSaturation} + ${satT.toFixed(3)} * (${eff.maxSaturation} - ${eff.minSaturation}) = ${(eff.minSaturation + satT * satRange).toFixed(1)}`;
+			}
+			if (litDebug) {
+				const litRange = eff.maxLightness - eff.minLightness;
+				const litT = l / 100;
+				litDebug.textContent = `t=${litT.toFixed(3)} | ${eff.minLightness} + ${litT.toFixed(3)} * (${eff.maxLightness} - ${eff.minLightness}) = ${(eff.minLightness + litT * litRange).toFixed(1)}`;
+			}
 		}
 
 		function updatePreview() {
 			updateGradients();
 			const color = getTextColor();
-			// Show clamped color in preview (what it will actually look like)
+			// Show mapped color in preview (what it will actually look like)
 			const effectiveConfig = getEffectiveColorConfig();
-			const clampedColor = clampColorToRange(color, effectiveConfig);
-			preview.style.cssText = '';
-			preview.style.color = clampedColor;
-			Object.assign(preview.style, parseCssText(cssInput.value));
+			// Always apply mapping - slider values are raw base values
+			const mappedColor = mapColorToRange(color, effectiveConfig);
 
 			// Apply style variations based on state (null = use global/hash default)
 			const effectiveWeight = weightState !== null ? (weightState ? 'bold' : 'normal') :
@@ -1492,9 +1901,22 @@
 				(styleConfig.varyItalic ? hashItalic : 'normal');
 			const effectiveCase = caseState !== null ? (caseState ? 'small-caps' : 'normal') :
 				(styleConfig.varyCase ? hashCase : 'normal');
-			preview.style.fontWeight = effectiveWeight;
-			preview.style.fontStyle = effectiveItalic;
-			preview.style.fontVariant = effectiveCase;
+
+			// Determine if we should invert (swap fg/bg)
+			let shouldInvert = false;
+			if (invertState === true) {
+				shouldInvert = true;
+			} else if (invertState === null) {
+				// Auto - check contrast threshold
+				const hsl = parseColorToHsl(mappedColor);
+				if (hsl) {
+					const bgLightness = getBackgroundLightness();
+					const threshold = effectiveConfig.contrastThreshold || 0;
+					const contrast = Math.abs(hsl.l - bgLightness);
+					shouldInvert = threshold > 0 && contrast < threshold;
+				}
+			}
+			// invertState === false means explicitly disabled
 
 			// Show icon in preview based on tri-state: true = custom, false = disabled, null = auto (global)
 			let iconValue = '';
@@ -1505,10 +1927,30 @@
 				iconValue = hashIcon;
 			}
 			// iconState === false means explicitly disabled, so iconValue stays empty
-			preview.textContent = iconValue ? iconValue + ' ' + username : username;
+
+			// Helper to apply styles to a preview element
+			const applyPreviewStyles = (el, isMention) => {
+				el.style.cssText = '';
+				if (shouldInvert) {
+					el.style.backgroundColor = mappedColor;
+					el.style.color = 'var(--color-bg, #0a0a0a)';
+				} else {
+					el.style.color = mappedColor;
+				}
+				Object.assign(el.style, parseCssText(cssInput.value));
+				el.style.fontWeight = effectiveWeight;
+				el.style.fontStyle = effectiveItalic;
+				el.style.fontVariant = effectiveCase;
+				const prefix = isMention ? '@' : '';
+				el.textContent = iconValue ? iconValue + ' ' + prefix + username : prefix + username;
+			};
+
+			// Update both previews (false = not mention, true = mention)
+			applyPreviewStyles(preview, false);
+			if (previewMention) applyPreviewStyles(previewMention, true);
 		}
 
-		// Parse initial color
+		// Parse initial color - load raw saved values directly to sliders
 		if (currentStyles.color) {
 			const hsl = parseColorToHsl(currentStyles.color);
 			if (hsl) {
@@ -1602,6 +2044,14 @@
 				updatePreview();
 			});
 		}
+		if (invertInput) {
+			invertInput.closest('label').addEventListener('click', (e) => {
+				e.preventDefault();
+				invertState = cycleTriState(invertState);
+				updateTriStateToggle(invertInput, invertState);
+				updatePreview();
+			});
+		}
 
 		updatePreview();
 	}
@@ -1634,57 +2084,52 @@
 	// =====================================================
 
 	function createSettingsPanel() {
+		const eff = getEffectiveColorConfig();
 		const dialog = createDialog({
 			title: 'Nick Color Settings',
 			width: '400px',
 			preview: `<div class="preview-row" id="settings-preview"></div>`,
 			content: `
-				<div class="nc-input-row-stacked">
-					<label for="settings-preset">Preset Theme:</label>
-					<select id="settings-preset">
-						<option value="">-- Select a preset --</option>
-						${Object.keys(PRESET_THEMES).map(name => `<option value="${name}">${name}</option>`).join('')}
-					</select>
-				</div>
+				${createDebugPre({
+					'Site Theme': siteTheme ? `fg:${siteTheme.fg} bg:${siteTheme.bg}` : 'not detected',
+					'Site Theme HSL': siteThemeHsl ? `H:${siteThemeHsl.h} S:${siteThemeHsl.s} L:${siteThemeHsl.l}` : 'N/A',
+					'Effective Config': `H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`,
+					'Contrast Threshold': eff.contrastThreshold,
+					'Custom Colors Saved': Object.keys(customNickColors).length
+				})}
+				${createInputRow({
+					label: 'Preset Theme:',
+					id: 'settings-preset',
+					type: 'select',
+					options: `<option value="">-- Select a preset --</option>${Object.keys(PRESET_THEMES).map(name => `<option value="${name}">${name}</option>`).join('')}`
+				})}
 				<hr />
 				<h4>Hue Range${siteThemeHsl ? '' : ' <span class="text-fg-dim">(no site theme)</span>'}</h4>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Use site theme foreground hue${siteThemeHsl ? ` <span style="color:hsl(${siteThemeHsl.h}, 100%, 50%)">(${siteThemeHsl.h}°)</span>` : ''}</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${siteThemeConfig.useHueRange ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-site-hue" class="sr-only" ${siteThemeConfig.useHueRange ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${siteThemeConfig.useHueRange ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${siteThemeConfig.useHueRange ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
+				${createToggleRow({
+					label: `Use site theme foreground hue${siteThemeHsl ? ` <span style="color:hsl(${siteThemeHsl.h}, 100%, 50%)">(${siteThemeHsl.h}°)</span>` : ''}`,
+					id: 'settings-site-hue',
+					checked: siteThemeConfig.useHueRange,
+					disabled: !siteThemeHsl
+				})}
 				<div id="hue-spread-container" style="display: ${siteThemeConfig.useHueRange ? 'block' : 'none'}"></div>
 				<div id="hue-slider-container"></div>
 				<hr />
 				<h4>Saturation Range</h4>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Use site theme foreground saturation${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.s}%)</span>` : ''}</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${siteThemeConfig.useSaturation ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-site-saturation" class="sr-only" ${siteThemeConfig.useSaturation ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${siteThemeConfig.useSaturation ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${siteThemeConfig.useSaturation ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
+				${createToggleRow({
+					label: `Use site theme foreground saturation${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.s}%)</span>` : ''}`,
+					id: 'settings-site-saturation',
+					checked: siteThemeConfig.useSaturation,
+					disabled: !siteThemeHsl
+				})}
 				<div id="sat-slider-container"></div>
 				<hr />
 				<h4>Lightness Range</h4>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Use site theme foreground lightness${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.l}%)</span>` : ''}</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${siteThemeConfig.useLightness ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-site-lightness" class="sr-only" ${siteThemeConfig.useLightness ? 'checked' : ''} ${siteThemeHsl ? '' : 'disabled'}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${siteThemeConfig.useLightness ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${siteThemeConfig.useLightness ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
+				${createToggleRow({
+					label: `Use site theme foreground lightness${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.l}%)</span>` : ''}`,
+					id: 'settings-site-lightness',
+					checked: siteThemeConfig.useLightness,
+					disabled: !siteThemeHsl
+				})}
 				<div id="lit-slider-container"></div>
 				<hr />
 				<h4>Contrast</h4>
@@ -1697,46 +2142,10 @@
 				<div class="hint" style="margin-top: -0.25rem; margin-bottom: 0.25rem;">
 					Add non-color variation to usernames (useful for limited color ranges)
 				</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Vary font weight</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.varyWeight ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-vary-weight" class="sr-only" ${styleConfig.varyWeight ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.varyWeight ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.varyWeight ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Vary italic</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.varyItalic ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-vary-italic" class="sr-only" ${styleConfig.varyItalic ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.varyItalic ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.varyItalic ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Vary small-caps</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.varyCase ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-vary-case" class="sr-only" ${styleConfig.varyCase ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.varyCase ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.varyCase ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
-				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
-					<label class="text-fg text-sm">Prepend icon</label>
-					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.prependIcon ? 'true' : 'false'}</div>
-						<input type="checkbox" id="settings-prepend-icon" class="sr-only" ${styleConfig.prependIcon ? 'checked' : ''}>
-						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.prependIcon ? 'bg-fg' : 'bg-fg-dim'}">
-							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.prependIcon ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-						</div>
-					</label>
-				</div>
+				${createToggleRow({ label: 'Vary font weight', id: 'settings-vary-weight', checked: styleConfig.varyWeight })}
+				${createToggleRow({ label: 'Vary italic', id: 'settings-vary-italic', checked: styleConfig.varyItalic })}
+				${createToggleRow({ label: 'Vary small-caps', id: 'settings-vary-case', checked: styleConfig.varyCase })}
+				${createToggleRow({ label: 'Prepend icon', id: 'settings-prepend-icon', checked: styleConfig.prependIcon })}
 				<div class="nc-input-row-stacked" id="icon-set-container" style="display: ${styleConfig.prependIcon ? 'block' : 'none'}">
 					<label class="text-fg text-sm">Icon set (space-separated)</label>
 					<input type="text" id="settings-icon-set" value="${styleConfig.iconSet}" placeholder="● ○ ◆ ◇ ■ □ ▲ △ ★ ☆">
@@ -1779,9 +2188,9 @@
 		const presetSelect = dialog.querySelector('#settings-preset');
 		const previewRow = dialog.querySelector('#settings-preview');
 		const previewNames = [
-			'z0ylent', 'CyB3rPuNk_42', 'n30n_gh0st', 'ZeR0C00L', 'h4x0r_elite',
-			'Ph4nt0m_', 'gl1tch_w1z', 'genghis_khan', 'ByteMe99', 'ShadowR00t',
-			'v01d_w4lk3r', 'N3tRuNn3r', 'D34TH.exe', 'l33t_hax', 'CrYpT0_K1D'
+			'z0ylent', 'CyB3rPuNk', 'n30n_gh0st', 'ZeR0C00L', 'an0nym0us',
+			'Ph4nt0m_', 'enki', 'genghis_khan', 'ByteMe99', 'neo', 'l1sb3th',
+			'Da5idMeier', 'N3tRuNn3r', 'acidBurn', 'fr33Kevin', 'triNity'
 		];
 		previewNames.forEach(name => {
 			const span = document.createElement('span');
@@ -1804,7 +2213,7 @@
 			label: 'Lightness Range', onChange: updatePreview
 		});
 		const contrastSlider = createSlider({
-			simple: true, min: 0, max: 50, value: colorConfig.contrastThreshold || 0,
+			simple: true, min: 0, max: 50, value: colorConfig.contrastThreshold || 50,
 			label: 'Contrast Threshold', onChange: updatePreview
 		});
 		const hueSpreadSlider = createSlider({
@@ -1860,11 +2269,24 @@
 			const hueStops = Array.from({ length: 13 }, (_, i) => {
 				const hue = i * 30;
 				return [hue, midS, midL, 1, (i * 30 / 360) * 100];
-				//return `hsl(${i * 30}, ${midS}%, ${midL}%) ${(i * 30 / 360) * 100}%`;
 			});
-			hueSlider.setGradient(hueStops); //`linear-gradient(to right, ${hueStops})`);
-			satSlider.setGradient([[midH, 0, midL, 1, 0], [midH, 100, midL, 1, 100]]); //`linear-gradient(to right, hsl(${midH}, 0%, ${midL}%), hsl(${midH}, 100%, ${midL}%))`);
-			litSlider.setGradient([[midH, midS, 0, 1, 0], [midH, midS, 50, 1, 50], [midH, midS, 100, 1, 100]]); //`linear-gradient(to right, hsl(${midH}, ${midS}%, 0%), hsl(${midH}, ${midS}%, 50%), hsl(${midH}, ${midS}%, 100%))`);
+			hueSlider.setGradient(hueStops);
+			satSlider.setGradient([[midH, 0, midL, 1, 0], [midH, 100, midL, 1, 100]]);
+			litSlider.setGradient([[midH, midS, 0, 1, 0], [midH, midS, 50, 1, 50], [midH, midS, 100, 1, 100]]);
+
+			// Update range thumb colors to show their values
+			hueSlider.setThumbColor([
+				`hsl(${minH}, ${midS}%, ${midL}%)`,
+				`hsl(${maxH}, ${midS}%, ${midL}%)`
+			]);
+			satSlider.setThumbColor([
+				`hsl(${midH}, ${minS}%, ${midL}%)`,
+				`hsl(${midH}, ${maxS}%, ${midL}%)`
+			]);
+			litSlider.setThumbColor([
+				`hsl(${midH}, ${midS}%, ${minL}%)`,
+				`hsl(${midH}, ${midS}%, ${maxL}%)`
+			]);
 		}
 
 		function updatePreview() {
@@ -1895,7 +2317,7 @@
 					const lit = eff.minLightness + (hash3 % Math.max(1, litRange + 1));
 					const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
 					// Invert colors if contrast is below threshold
-					const threshold = eff.contrastThreshold || 0;
+					const threshold = eff.contrastThreshold || 50;
 					if (threshold > 0 && Math.abs(lit - bgLightness) < threshold) {
 						el.style.backgroundColor = color;
 						el.style.color = 'var(--color-bg, #000)';
@@ -1924,7 +2346,7 @@
 				hueSlider.setValues([p.color.minHue, p.color.maxHue]);
 				satSlider.setValues([p.color.minSaturation, p.color.maxSaturation]);
 				litSlider.setValues([p.color.minLightness, p.color.maxLightness]);
-				contrastSlider.setValue(p.color.contrastThreshold || 0);
+				contrastSlider.setValue(p.color.contrastThreshold || 50);
 				updatePreview();
 			}
 		});
@@ -2078,7 +2500,8 @@
 		const target = e.target.closest('[data-nick-colored], [data-mention-colored]');
 		if (target && target.dataset.username) {
 			e.preventDefault();
-			createColorPicker(target.dataset.username, generateStyles(target.dataset.username));
+			// Use raw styles for picker so sliders show raw saved values
+			createColorPicker(target.dataset.username, getRawStylesForPicker(target.dataset.username));
 		}
 	});
 
