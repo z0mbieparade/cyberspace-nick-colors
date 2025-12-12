@@ -37,7 +37,7 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 
 ## Nick Style Override
 
-The script links to [overrides.json](/overrides.json), and loads any colors saved there. If you'd like a style applied site-wide for other users running the script to see, message me on [@z0ylent](https://cyberspace.online/z0ylent) and I'll update it.
+The script links to [overrides.json](/overrides.json), and loads any colors saved there. If you'd like a style applied site-wide for other users running the script to see, message me on [Cyberspace](https://cyberspace.online/z0ylent) and I'll update it.
 
 ## Site Theme Integration
 
