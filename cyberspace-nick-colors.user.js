@@ -360,6 +360,13 @@
 		'.nc-dialog-attribution'
 	];
 
+	const EXCLUDE_VALUES = [
+		'feed', 'topics', 'jukebox', 'notes', 'write',
+		'chat', 'messages', 'bookmarks', 'notifications',
+		'me', 'guilds', 'support', 'wiki', 'changelog',
+		'netiquette',  'faq', 'loading', 'error'
+	];
+
 	// Containers where we should invert backgroundColor/Color for nicks
 	const INVERTED_CONTAINERS = [
 		'.profile-box-inverted'
@@ -439,6 +446,9 @@
 				return { success: false, message: 'Invalid data format' };
 			}
 
+			// Expand minified keys if present
+			data = maxifyKeys(data);
+
 			// Validate version (for future compatibility)
 			if (data.version && data.version > EXPORT_VERSION) {
 				return { success: false, message: `Export version ${data.version} is newer than supported version ${EXPORT_VERSION}` };
@@ -475,6 +485,80 @@
 		}
 	}
 
+	// Key mappings for minification (full key -> short key)
+	const KEY_MAP = {
+		// Color config
+		minSaturation: 'mS',
+		maxSaturation: 'xS',
+		minLightness: 'mL',
+		maxLightness: 'xL',
+		minHue: 'mH',
+		maxHue: 'xH',
+		excludeRanges: 'eR',
+		contrastThreshold: 'cT',
+		// Site theme config
+		useHueRange: 'uH',
+		hueSpread: 'hS',
+		useSaturation: 'uS',
+		useLightness: 'uL',
+		// Style config
+		varyWeight: 'vW',
+		varyItalic: 'vI',
+		varyCase: 'vC',
+		prependIcon: 'pI',
+		appendIcon: 'aI',
+		iconSet: 'iS',
+		// Per-user style properties
+		color: 'c',
+		backgroundColor: 'bg',
+		fontWeight: 'fW',
+		fontStyle: 'fS',
+		fontVariant: 'fV',
+		invert: 'inv',
+		// Config sections
+		colorConfig: 'cc',
+		siteThemeConfig: 'stc',
+		styleConfig: 'sc',
+		customNickColors: 'cnc',
+		version: 'v',
+		exportedAt: 'at'
+	};
+
+	// Reverse mapping (short key -> full key)
+	const KEY_MAP_REVERSE = Object.fromEntries(
+		Object.entries(KEY_MAP).map(([k, v]) => [v, k])
+	);
+
+	/**
+	 * Minify an object by replacing keys with short versions
+	 */
+	function minifyKeys(obj) {
+		if (obj === null || typeof obj !== 'object') return obj;
+		if (Array.isArray(obj)) return obj.map(minifyKeys);
+
+		const result = {};
+		for (const [key, value] of Object.entries(obj)) {
+			const shortKey = KEY_MAP[key] || key;
+			result[shortKey] = minifyKeys(value);
+		}
+		return result;
+	}
+
+	/**
+	 * Maxify an object by replacing short keys with full versions
+	 */
+	function maxifyKeys(obj) {
+		if (obj === null || typeof obj !== 'object') return obj;
+		if (Array.isArray(obj)) return obj.map(maxifyKeys);
+
+		const result = {};
+		for (const [key, value] of Object.entries(obj)) {
+			const fullKey = KEY_MAP_REVERSE[key] || key;
+			result[fullKey] = maxifyKeys(value);
+		}
+		return result;
+	}
+
 	/**
 	 * Download data as a JSON file
 	 */
@@ -503,6 +587,220 @@
 		a.click();
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
+	}
+
+	// =====================================================
+	// UNIFIED IMPORT/EXPORT HELPERS
+	// =====================================================
+
+	/**
+	 * Save data to a JSON file (minified keys)
+	 * @param {Object} data - The data to save
+	 * @param {string} filename - The filename to save as
+	 */
+	function saveToFile(data, filename) {
+		downloadJson(minifyKeys(data), filename);
+	}
+
+	/**
+	 * Copy data to clipboard as JSON (minified keys)
+	 * @param {Object} data - The data to copy
+	 * @returns {Promise<boolean>} - Success status
+	 */
+	async function copyToClipboard(data) {
+		try {
+			await navigator.clipboard.writeText(JSON.stringify(minifyKeys(data)));
+			return true;
+		} catch (err) {
+			throw new Error(`Failed to copy: ${err.message}`);
+		}
+	}
+
+	/**
+	 * Load data from a JSON file (auto-expands minified keys)
+	 * @param {Function} callback - Called with parsed data on success
+	 */
+	function loadFromFile(callback) {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json';
+		input.onchange = (e) => {
+			const file = e.target.files[0];
+			if (!file) return;
+			const reader = new FileReader();
+			reader.onload = (event) => {
+				try {
+					const data = maxifyKeys(JSON.parse(event.target.result));
+					callback(data, null);
+				} catch (err) {
+					callback(null, new Error(`Failed to parse file: ${err.message}`));
+				}
+			};
+			reader.readAsText(file);
+		};
+		input.click();
+	}
+
+	/**
+	 * Show a paste dialog and call callback with parsed data
+	 * @param {Function} callback - Called with (data, error) when user submits
+	 */
+	function showPasteDialog(callback) {
+		const overlay = document.createElement('div');
+		overlay.className = 'nc-dialog-overlay';
+		overlay.innerHTML = `
+			<div class="nc-dialog" style="min-width: 400px; max-width: 500px;">
+				<div class="nc-dialog-header nc-flex nc-justify-between">
+					<h3>Paste Settings</h3>
+					<div class="spacer"></div>
+					<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
+				</div>
+				<div class="nc-dialog-content">
+					<div class="hint" style="margin-bottom: 0.5rem;">Paste your settings JSON below (Ctrl+V or right-click → Paste)</div>
+					<textarea id="paste-settings-input" style="min-height: 150px; width: 100%; font-family: monospace; font-size: 0.75rem;" placeholder="Paste settings JSON here..."></textarea>
+				</div>
+				<div class="nc-dialog-footer">
+					<div class="buttons nc-flex nc-items-center nc-gap-2">
+						<button class="nc-import-btn link-brackets"><span class="inner">IMPORT</span></button>
+						<button class="nc-cancel-btn link-brackets"><span class="inner">CANCEL</span></button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		const close = () => overlay.remove();
+		const textarea = overlay.querySelector('#paste-settings-input');
+
+		overlay.querySelector('.nc-header-close').addEventListener('click', close);
+		overlay.querySelector('.nc-cancel-btn').addEventListener('click', close);
+		overlay.querySelector('.nc-import-btn').addEventListener('click', () => {
+			const text = textarea.value.trim();
+			if (!text) {
+				alert('Please paste settings JSON first');
+				return;
+			}
+			try {
+				const data = maxifyKeys(JSON.parse(text));
+				close();
+				callback(data, null);
+			} catch (err) {
+				callback(null, new Error(`Failed to parse: ${err.message}`));
+			}
+		});
+
+		// Close on backdrop click
+		overlay.addEventListener('click', (e) => {
+			if (e.target === overlay) close();
+		});
+
+		// Close on Escape
+		overlay.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') close();
+		});
+
+		document.body.appendChild(overlay);
+		textarea.focus();
+	}
+
+	/**
+	 * Open a new message to a user on Cyberspace
+	 * Navigates to their profile and triggers the 'C' keyboard shortcut to compose
+	 * @param {string} username - The username to message (without @)
+	 * @param {string} [message] - Optional message to pre-fill in the compose box
+	 */
+	function openMessageToUser(username, message = null) {
+		// Navigate to user's profile, then trigger compose shortcut
+		const profileUrl = `https://cyberspace.online/${username}`;
+
+		// If we're already on their profile, just trigger the shortcut
+		if (window.location.pathname === `/${username}`) {
+			console.log('navigated to user profile, triggering compose shortcut');
+			document.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', bubbles: true }));
+			return;
+		}
+
+		// Otherwise navigate and trigger after page load
+		// Store flag in sessionStorage to trigger compose after navigation
+		sessionStorage.setItem('nickColors_openCompose', 'true');
+		if (message) {
+			sessionStorage.setItem('nickColors_composeMessage', message);
+		}
+		window.location.href = profileUrl;
+	}
+
+	// Check if we need to open compose after navigation
+	if (sessionStorage.getItem('nickColors_openCompose') === 'true') {
+		sessionStorage.removeItem('nickColors_openCompose');
+		console.log('[NickColors] Detected openCompose flag, will try to open compose');
+
+		// Wait for the site to be ready by polling for the C-Mail button on profile
+		function tryOpenCompose(attempts = 0) {
+			console.log(`[NickColors] tryOpenCompose attempt ${attempts}, readyState: ${document.readyState}`);
+
+			// Look for the C-Mail button - need to find the smallest element containing "[C] C-Mail"
+			// Use TreeWalker to find text nodes, then get their parent
+			let cmailButton = null;
+			const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+			let node;
+			while (node = walker.nextNode()) {
+				const text = node.textContent?.trim() || '';
+				if (text.includes('[C]') && text.includes('C-Mail')) {
+					// Found the text node, get its parent element
+					cmailButton = node.parentElement;
+					console.log(`[NickColors] Found text node with C-Mail, parent: ${cmailButton?.tagName}, text: "${text}"`);
+					break;
+				}
+			}
+
+			if (cmailButton) {
+				console.log('[NickColors] Found C-Mail button, clicking it:', cmailButton);
+				cmailButton.click();
+
+				// Check if we have a message to pre-fill
+				const message = sessionStorage.getItem('nickColors_composeMessage');
+				if (message) {
+					sessionStorage.removeItem('nickColors_composeMessage');
+					// Wait for the compose input to appear, then fill it
+					setTimeout(() => tryFillMessage(message, 0), 300);
+				}
+			} else if (attempts > 30) {
+				console.log('[NickColors] Max attempts reached, giving up');
+			} else {
+				// Retry after a delay
+				console.log('[NickColors] C-Mail button not found, retrying in 500ms');
+				setTimeout(() => tryOpenCompose(attempts + 1), 500);
+			}
+		}
+
+		// Try to fill the message input
+		function tryFillMessage(message, attempts) {
+			console.log(`[NickColors] tryFillMessage attempt ${attempts}`);
+			const input = document.querySelector('input[placeholder="Type a message..."], textarea[placeholder="Type a message..."]');
+			if (input) {
+				console.log('[NickColors] Found message input, filling it');
+				input.focus();
+				input.value = message;
+				// Trigger input event so the site's JS knows the value changed
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+			} else if (attempts < 20) {
+				setTimeout(() => tryFillMessage(message, attempts + 1), 200);
+			} else {
+				console.log('[NickColors] Could not find message input, giving up');
+			}
+		}
+
+		// Start trying after initial page load
+		console.log('[NickColors] readyState:', document.readyState);
+		if (document.readyState === 'complete') {
+			console.log('[NickColors] Page already complete, starting in 1s');
+			setTimeout(tryOpenCompose, 1000);
+		} else {
+			console.log('[NickColors] Waiting for load event');
+			window.addEventListener('load', () => {
+				console.log('[NickColors] Load event fired, starting in 1s');
+				setTimeout(tryOpenCompose, 1000);
+			});
+		}
 	}
 
 	/**
@@ -584,72 +882,37 @@
 	}
 
 	/**
-	 * Prompt user to select a JSON file and import it
+	 * Show a dialog for reporting issues with input fields
 	 */
-	function promptImportFile() {
-		const input = document.createElement('input');
-		input.type = 'file';
-		input.accept = '.json,application/json';
-		input.onchange = (e) => {
-			const file = e.target.files[0];
-			if (!file) return;
-
-			const reader = new FileReader();
-			reader.onload = (event) => {
-				try {
-					const data = JSON.parse(event.target.result);
-					const result = importSettings(data);
-					alert(result.message);
-					if (result.success) {
-						// Close and reopen settings dialog to refresh UI
-						const settingsOverlay = document.querySelector('.nc-dialog-overlay');
-						if (settingsOverlay) {
-							settingsOverlay.remove();
-							createSettingsPanel();
-						}
-					}
-				} catch (err) {
-					alert(`Failed to parse file: ${err.message}`);
-				}
-			};
-			reader.readAsText(file);
-		};
-		input.click();
-	}
-
-	/**
-	 * Copy settings JSON to clipboard
-	 */
-	async function copySettingsToClipboard() {
-		const data = exportSettings();
-		try {
-			await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-			alert('Settings copied to clipboard');
-		} catch (err) {
-			alert(`Failed to copy: ${err.message}`);
-		}
-	}
-
-	/**
-	 * Show a paste dialog for importing settings
-	 */
-	function showPasteDialog() {
+	function showReportIssueDialog() {
 		const overlay = document.createElement('div');
 		overlay.className = 'nc-dialog-overlay';
 		overlay.innerHTML = `
 			<div class="nc-dialog" style="min-width: 400px; max-width: 500px;">
 				<div class="nc-dialog-header nc-flex nc-justify-between">
-					<h3>Paste Settings</h3>
+					<h3>Report Issue</h3>
 					<div class="spacer"></div>
 					<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 				</div>
 				<div class="nc-dialog-content">
-					<div class="hint" style="margin-bottom: 0.5rem;">Paste your settings JSON below (Ctrl+V or right-click → Paste)</div>
-					<textarea id="paste-settings-input" style="min-height: 150px; width: 100%; font-family: monospace; font-size: 0.75rem;" placeholder="Paste settings JSON here..."></textarea>
+					<div class="hint" style="margin-bottom: 0.75rem;">Fill out the fields below to report an issue. All fields are required.</div>
+					<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+						<label for="report-issue">What issue are you experiencing?</label>
+						<textarea id="report-issue" placeholder="Describe the problem..." style="width: 100%; min-height: 60px;"></textarea>
+					</div>
+					<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+						<label for="report-steps">Steps to reproduce:</label>
+						<textarea id="report-steps" placeholder="1. Go to...\n2. Click on...\n3. See error..." style="width: 100%; min-height: 60px;"></textarea>
+					</div>
+					<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+						<label for="report-errors">Any error messages? (check browser console)</label>
+						<input type="text" id="report-errors" placeholder="Optional - paste any errors" style="width: 100%;">
+					</div>
+					<div class="hint" style="margin-top: 0.5rem; font-size: 0.7rem;">Debug info will be automatically included.</div>
 				</div>
 				<div class="nc-dialog-footer">
 					<div class="buttons nc-flex nc-items-center nc-gap-2">
-						<button class="nc-import-paste-btn link-brackets"><span class="inner">IMPORT</span></button>
+						<button class="nc-submit-report-btn link-brackets"><span class="inner">SEND REPORT</span></button>
 						<button class="nc-cancel-btn link-brackets"><span class="inner">CANCEL</span></button>
 					</div>
 				</div>
@@ -657,32 +920,50 @@
 		`;
 
 		const close = () => overlay.remove();
-		const textarea = overlay.querySelector('#paste-settings-input');
+
+		const issueInput = overlay.querySelector('#report-issue');
+		const stepsInput = overlay.querySelector('#report-steps');
+		const errorsInput = overlay.querySelector('#report-errors');
 
 		overlay.querySelector('.nc-header-close').addEventListener('click', close);
 		overlay.querySelector('.nc-cancel-btn').addEventListener('click', close);
-		overlay.querySelector('.nc-import-paste-btn').addEventListener('click', () => {
-			const text = textarea.value.trim();
-			if (!text) {
-				alert('Please paste settings JSON first');
+		overlay.querySelector('.nc-submit-report-btn').addEventListener('click', () => {
+			const issue = issueInput.value.trim();
+			const steps = stepsInput.value.trim();
+			const errors = errorsInput.value.trim();
+
+			// Validate required fields
+			if (!issue) {
+				alert('Please describe the issue');
+				issueInput.focus();
 				return;
 			}
-			try {
-				const data = JSON.parse(text);
-				const result = importSettings(data);
-				alert(result.message);
-				if (result.success) {
-					close();
-					// Close and reopen settings dialog to refresh UI
-					const settingsOverlay = document.querySelector('.nc-dialog-overlay');
-					if (settingsOverlay) {
-						settingsOverlay.remove();
-						createSettingsPanel();
-					}
-				}
-			} catch (err) {
-				alert(`Failed to parse settings: ${err.message}`);
+			if (!steps) {
+				alert('Please provide steps to reproduce');
+				stepsInput.focus();
+				return;
 			}
+
+			// Build condensed debug info
+			const eff = getEffectiveColorConfig();
+			const debugInfo = `v${VERSION} | ${Object.keys(customNickColors).length} custom | H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`;
+
+			// Build condensed settings object
+			const settings = {
+				color: colorConfig,
+				siteTheme: siteThemeConfig,
+				style: styleConfig
+			};
+
+			// Build message
+			let message = `[Nick Colors Issue Report]| Issue: ${issue} | Steps: ${steps}`;
+			if (errors) {
+				message += ` | Errors: ${errors}`;
+			}
+			message += ` | Debug: ${debugInfo} | Page: ${window.location.href} | Settings: ${JSON.stringify(minifyKeys(settings))}`;
+
+			close();
+			openMessageToUser('z0ylent', message);
 		});
 
 		// Close on backdrop click
@@ -696,7 +977,7 @@
 		});
 
 		document.body.appendChild(overlay);
-		textarea.focus();
+		usernameInput.focus();
 	}
 
 	function hashString(str) {
@@ -991,6 +1272,17 @@
 	// USERNAME DETECTION
 	// =====================================================
 
+	function isValidUsername(username) {
+		if (!username) return false;
+		if (username.startsWith('@')) username = username.slice(1);
+		username = username.trim().toLowerCase();
+
+		if (EXCLUDE_VALUES.includes(username)) return false;
+		if (username.includes(' ')) return false;
+
+		return true;
+	}
+
 	function extractUsername(element) {
 		// Try to get username from the element
 		// Customize this based on how the site structures usernames
@@ -1003,12 +1295,12 @@
 			// Skip paths that start with known non-user routes
 			if (!pathAfterSlash.includes('/') && !pathAfterSlash.includes('.')) {
 				const match = href.match(/^\/([^\/\?#]+)/);
-				if (match) return match[1];
+				if (match && isValidUsername(match[1])) return match[1];
 			}
 		}
 
 		// From data attribute
-		if (element.dataset.username) {
+		if (element.dataset.username && isValidUsername(element.dataset.username)) {
 			return element.dataset.username;
 		}
 
@@ -1021,8 +1313,8 @@
 		}
 		if (text && text.length < 30) {
 		  	//if starts with @ remove
-		  	if(text.startsWith('@')) return text.slice(1);
-			return text;
+		  	if(text.startsWith('@')) text = text.slice(1);
+			if(isValidUsername(text)) return text;
 		}
 
 		return null;
@@ -1051,38 +1343,7 @@
 		if (slashCount > 1) {
 			return false;
 		}
-
-		//strip slash from start for checking
-		const hrefPath = href.startsWith('/') ? href.slice(1) : href;
-		if([
-			'feed',
-			'topics',
-			'jukebox',
-			'notes',
-			'write',
-			'chat',
-			'messages',
-			'bookmarks',
-			'notifications',
-			'me',
-			'guilds',
-			'support',
-			'wiki',
-			'changelog',
-			'netiquette', 
-			'faq',
-		].includes(hrefPath.toLowerCase())) {
-			return false;
-		}
-
-		if (href.includes('/static/') ||
-			href.includes('/assets/') ||
-			href.includes('.js') ||
-			href.includes('.css') ||
-			href.endsWith('/')) {
-			return false;
-		}
-
+		
 		// If container hints are specified, ONLY color within those containers
 		if (CONTAINER_HINTS.length > 0) {
 			const inContainer = CONTAINER_HINTS.some(sel => element.closest(sel));
@@ -1099,7 +1360,9 @@
 			}
 		}
 
-		return true;
+		//strip slash from start for checking
+		const hrefPath = href.startsWith('/') ? href.slice(1) : href;
+		return isValidUsername(hrefPath);
 	}
 
 	function colorizeAll() {
@@ -1168,6 +1431,10 @@
 				// Skip if followed by a dot and more text (like @site.com)
 				const afterMatch = text.slice(match.index + match[0].length);
 				if (/^\.[a-zA-Z]/.test(afterMatch)) {
+					continue;
+				}
+				// Skip excluded usernames
+				if (!isValidUsername(match[1])) {
 					continue;
 				}
 				matches.push({
@@ -1646,7 +1913,7 @@
 			border: none; 
 			padding: 0;
 			color: var(--color-fg-dim, #888);
-			flex: 0;
+			flex: 0 0 auto;
 		}
 		.nc-dialog button.link-brackets:hover { border-color: var(--color-fg, #FFF); }
 		.nc-dialog button.link-brackets .inner::before {
@@ -1740,6 +2007,10 @@
 			border-top: 1px dotted var(--color-border, #333);
 			margin-top: 0.3rem; font-size: 0.625rem; color: var(--color-fg-dim, #666);
 			padding-top: 0.3rem;
+		}
+		
+		.nc-dialog .nc-dialog-warning {
+			color: rgba(255, 183, 0, 0.7);
 		}
 
 		/* Layout utility classes */
@@ -1941,8 +2212,8 @@
 					${content}
 				</div>
 				<div class="nc-dialog-footer">
-					<div class="buttons nc-flex nc-flex-wrap nc-items-center nc-gap-2">
-						${buttons.map(b => `<button class="${b.class || ''} link-brackets"><span class="inner">${b.label}</span></button>`).join('')}
+					<div class="nc-dialog-warning hint">
+						This is a custom userscript. Do NOT report issues to the creator of Cyberspace. Use the [SETTINGS] -> [REPORT ISSUE] button.
 					</div>
 					<div class="nc-dialog-attribution hint">
 						<span>created by <a href="/z0ylent">@z0ylent</a></span>
@@ -1951,7 +2222,11 @@
 						<span> | </span>
 						<span><a class="github-link" href="https://github.com/z0mbieparade/cyberspace-nick-colors" target="_blank" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" height="14px"> <path fill="currentColor" d="M5 2h4v2H7v2H5V2Zm0 10H3V6h2v6Zm2 2H5v-2h2v2Zm2 2v-2H7v2H3v-2H1v2h2v2h4v4h2v-4h2v-2H9Zm0 0v2H7v-2h2Zm6-12v2H9V4h6Zm4 2h-2V4h-2V2h4v4Zm0 6V6h2v6h-2Zm-2 2v-2h2v2h-2Zm-2 2v-2h2v2h-2Zm0 2h-2v-2h2v2Zm0 0h2v4h-2v-4Z"/> </svg></a></span>
 						<span> | </span>
-						<span>v${VERSION}</span>
+						<span>v${VERSION}</span><br />
+					</div>
+					<hr />
+					<div class="buttons nc-flex nc-flex-wrap nc-items-center nc-gap-2">
+						${buttons.map(b => `<button class="${b.class || ''} link-brackets"><span class="inner">${b.label}</span></button>`).join('')}
 					</div>
 				</div>
 			</div>
@@ -2074,9 +2349,9 @@
 
 		const dialog = createDialog({
 			title: `Nick: ${username}`,
-			width: '320px',
+			width: '350px',
 			onSettings: () => createSettingsPanel(),
-			preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message<br />Inline mention <span id="picker-preview-mention">@${username}</span> example</div>`,
+			preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message in cIRC<br />Inline mention in plain text <span id="picker-preview-mention">@${username}</span> example</div>`,
 			content: `
 				${createDebugPre({
 					'Color Source': colorSource,
@@ -2164,6 +2439,16 @@
 					hint: 'CSS properties, one per line',
 					classes: 'no-padding-top'
 				})}
+				<hr />
+				<h4>Backup</h4>
+				${createInputRow({ type: 'button', label: 'Export user settings to file', id: 'picker-export-file', buttonText: 'Save Settings File' })}
+				${createInputRow({ type: 'button', label: 'Export user settings to clipboard', id: 'picker-export-copy', buttonText: 'Copy to Clipboard' })}
+				${createInputRow({ type: 'button', label: 'Import user settings from file', id: 'picker-import-file', buttonText: 'Load Settings File' })}
+				${createInputRow({ type: 'button', label: 'Import user settings from clipboard', id: 'picker-import-paste', buttonText: 'Paste from Clipboard' })}
+				<hr />
+				<h4>Request Override</h4>
+				<div class="hint">If you want your nickname to show up the same for everyone using the Nick Colors script, you can request an override. If the button below doesn't work, you can click 'Copy to Clipboard' above, and send it manually to <a href="/z0ylent">@z0ylent</a>.</div>
+				${createInputRow({ type: 'button', label: 'Message @z0ylent to request override', id: 'picker-request-override', buttonText: 'Request Override' })}
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
@@ -2553,6 +2838,167 @@
 				invertState = cycleTriState(invertState);
 				updateTriStateToggle(invertInput, invertState);
 				updatePreview();
+			});
+		}
+
+		// Helper to build current styles object
+		function buildCurrentStyles() {
+			const styles = { color: getTextColor(), ...parseCssText(cssInput.value) };
+			if (prependIconState === true) {
+				styles.prependIcon = prependIconInput.value.trim();
+			} else if (prependIconState === false) {
+				styles.prependIcon = '';
+			}
+			if (appendIconState === true) {
+				styles.appendIcon = appendIconInput.value.trim();
+			} else if (appendIconState === false) {
+				styles.appendIcon = '';
+			}
+			if (weightState !== null) {
+				styles.fontWeight = weightState ? 'bold' : 'normal';
+			}
+			if (italicState !== null) {
+				styles.fontStyle = italicState ? 'italic' : 'normal';
+			}
+			if (caseState !== null) {
+				styles.fontVariant = caseState ? 'small-caps' : 'normal';
+			}
+			if (invertState !== null) {
+				styles.invert = invertState;
+			}
+			return styles;
+		}
+
+		// Export to file button handler
+		const exportFileBtn = dialog.querySelector('#picker-export-file');
+		if (exportFileBtn) {
+			exportFileBtn.addEventListener('click', () => {
+				const exportData = { [username]: buildCurrentStyles() };
+				const timestamp = new Date().toISOString().slice(0, 10);
+				saveToFile(exportData, `nick-colors-${username}-${timestamp}.json`);
+			});
+		}
+
+		// Export to clipboard button handler
+		const exportCopyBtn = dialog.querySelector('#picker-export-copy');
+		if (exportCopyBtn) {
+			exportCopyBtn.addEventListener('click', async () => {
+				const exportData = { [username]: buildCurrentStyles() };
+				try {
+					await copyToClipboard(exportData);
+					alert('Copied to clipboard!');
+				} catch (err) {
+					alert(err.message);
+				}
+			});
+		}
+
+		// Import from file button handler
+		const importFileBtn = dialog.querySelector('#picker-import-file');
+		if (importFileBtn) {
+			importFileBtn.addEventListener('click', () => {
+				loadFromFile((data, err) => {
+					if (err) {
+						alert(err.message);
+						return;
+					}
+					// Check if data has this username's settings
+					const userSettings = data[username] || Object.values(data)[0];
+					if (userSettings) {
+						applyImportedUserSettings(userSettings);
+						alert('Settings imported!');
+					} else {
+						alert('No valid user settings found in file');
+					}
+				});
+			});
+		}
+
+		// Import from clipboard button handler
+		const importPasteBtn = dialog.querySelector('#picker-import-paste');
+		if (importPasteBtn) {
+			importPasteBtn.addEventListener('click', () => {
+				showPasteDialog((data, err) => {
+					if (err) {
+						alert(err.message);
+						return;
+					}
+					// Check if data has this username's settings
+					const userSettings = data[username] || Object.values(data)[0];
+					if (userSettings) {
+						applyImportedUserSettings(userSettings);
+						alert('Settings imported!');
+					} else {
+						alert('No valid user settings found in clipboard');
+					}
+				});
+			});
+		}
+
+		// Helper to apply imported user settings to the dialog
+		function applyImportedUserSettings(settings) {
+			// Apply color
+			if (settings.color) {
+				const hsl = hexToHsl(settings.color);
+				if (hsl) {
+					hueSlider.value = hsl.h;
+					satSlider.value = hsl.s;
+					litSlider.value = hsl.l;
+					updateColorInputs();
+				}
+			}
+			// Apply CSS (backgroundColor and other styles)
+			const cssProps = [];
+			if (settings.backgroundColor) cssProps.push(`background-color: ${settings.backgroundColor}`);
+			if (settings.fontWeight) cssProps.push(`font-weight: ${settings.fontWeight}`);
+			if (settings.fontStyle) cssProps.push(`font-style: ${settings.fontStyle}`);
+			if (settings.fontVariant) cssProps.push(`font-variant: ${settings.fontVariant}`);
+			if (cssProps.length > 0) {
+				cssInput.value = cssProps.join('; ');
+			}
+			// Apply prepend icon
+			if (settings.prependIcon !== undefined) {
+				if (settings.prependIcon === '') {
+					prependIconState = false;
+				} else {
+					prependIconState = true;
+					prependIconInput.value = settings.prependIcon;
+				}
+				updatePrependIconToggle();
+			}
+			// Apply append icon
+			if (settings.appendIcon !== undefined) {
+				if (settings.appendIcon === '') {
+					appendIconState = false;
+				} else {
+					appendIconState = true;
+					appendIconInput.value = settings.appendIcon;
+				}
+				updateAppendIconToggle();
+			}
+			// Apply style overrides
+			if (settings.fontWeight !== undefined) {
+				weightState = settings.fontWeight === 'bold' ? true : settings.fontWeight === 'normal' ? false : null;
+				updateWeightToggle();
+			}
+			if (settings.fontStyle !== undefined) {
+				italicState = settings.fontStyle === 'italic' ? true : settings.fontStyle === 'normal' ? false : null;
+				updateItalicToggle();
+			}
+			if (settings.fontVariant !== undefined) {
+				caseState = settings.fontVariant === 'small-caps' ? true : settings.fontVariant === 'normal' ? false : null;
+				updateCaseToggle();
+			}
+			updatePreview();
+		}
+
+		// Request override button handler
+		const requestOverrideBtn = dialog.querySelector('#picker-request-override');
+		if (requestOverrideBtn) {
+			requestOverrideBtn.addEventListener('click', () => {
+				const exportData = { [username]: buildCurrentStyles() };
+				const message = `Hi! I'd like to request a site-wide nick color override: ${JSON.stringify(minifyKeys(exportData))}`;
+				openMessageToUser('z0ylent', message);
 			});
 		}
 
@@ -3028,25 +3474,60 @@
 			exportFileBtn.addEventListener('click', () => {
 				const data = exportSettings();
 				const timestamp = new Date().toISOString().slice(0, 10);
-				downloadJson(data, `nick-colors-settings-${timestamp}.json`);
+				saveToFile(data, `nick-colors-settings-${timestamp}.json`);
 			});
 		}
 
 		if (exportCopyBtn) {
-			exportCopyBtn.addEventListener('click', () => {
-				copySettingsToClipboard();
+			exportCopyBtn.addEventListener('click', async () => {
+				try {
+					await copyToClipboard(exportSettings());
+					alert('Settings copied to clipboard');
+				} catch (err) {
+					alert(err.message);
+				}
 			});
 		}
 
 		if (importFileBtn) {
 			importFileBtn.addEventListener('click', () => {
-				promptImportFile();
+				loadFromFile((data, err) => {
+					if (err) {
+						alert(err.message);
+						return;
+					}
+					const result = importSettings(data);
+					alert(result.message);
+					if (result.success) {
+						// Close and reopen settings dialog to refresh UI
+						const settingsOverlay = document.querySelector('.nc-dialog-overlay');
+						if (settingsOverlay) {
+							settingsOverlay.remove();
+							createSettingsPanel();
+						}
+					}
+				});
 			});
 		}
 
 		if (importPasteBtn) {
 			importPasteBtn.addEventListener('click', () => {
-				showPasteDialog();
+				showPasteDialog((data, err) => {
+					if (err) {
+						alert(err.message);
+						return;
+					}
+					const result = importSettings(data);
+					alert(result.message);
+					if (result.success) {
+						// Close and reopen settings dialog to refresh UI
+						const settingsOverlay = document.querySelector('.nc-dialog-overlay');
+						if (settingsOverlay) {
+							settingsOverlay.remove();
+							createSettingsPanel();
+						}
+					}
+				});
 			});
 		}
 
@@ -3080,37 +3561,7 @@
 
 		if (reportIssueBtn) {
 			reportIssueBtn.addEventListener('click', () => {
-				const debugLog = exportDebugLogs();
-				const subject = encodeURIComponent('Nick Colors Issue Report');
-				const body = encodeURIComponent(`
-== ISSUE REPORT ==
-
-**What is your username on cyberspace.online?**
-
-
-**What issue are you experiencing?**
-(Describe the problem you're seeing)
-
-
-**What page did you see this on?**
-${window.location.href}
-
-**Steps to reproduce:**
-(What were you doing when the issue occurred?)
-1.
-2.
-3.
-
-**Any error messages?**
-(Paste any errors from the browser console, or attach screenshots)
-
-
-
-== DEBUG LOG ==
-
-${debugLog}
-`.trim());
-				window.open(`mailto:hey@z0m.bi?subject=${subject}&body=${body}`, '_blank');
+				showReportIssueDialog();
 			});
 		}
 
