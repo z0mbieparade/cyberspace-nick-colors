@@ -238,8 +238,9 @@ function applyStyles(element, username) {
 			delete styles.padding;
 		} else if (styles.color) {
 			// Normal color - invert it for the container
+			// Use --color-bg for text since container background is already inverted (light)
 			styles.backgroundColor = styles.color;
-			styles.color = 'var(--color-fg, #fff)';
+			styles.color = 'var(--color-bg, #000)';
 			styles.padding = '0 0.25rem';
 		}
 	}
