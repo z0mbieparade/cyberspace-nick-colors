@@ -49,9 +49,7 @@
 	// Or simple format: 'username': 'css-color' (text color only)
 	// These are merged with fetched overrides (local takes precedence)
 	// Add local overrides here for testing, or they will be fetched from OVERRIDES_URL
-	let MANUAL_OVERRIDES = {
-		'z0ylent': { color: '#00FF00' },
-	};
+	let MANUAL_OVERRIDES = {};
 
 	// Try to read site's custom theme from localStorage
 	let siteTheme = null;
@@ -74,6 +72,15 @@
 		maxHue: 360,         // ending hue (360 = back to red)
 		excludeRanges: [],   // exclude hue ranges, e.g., [[40,70]] to skip muddy yellows
 		contrastThreshold: 0, // 0-50, add outline if lightness contrast below this (0 = disabled)
+	};
+
+	// Default style variation settings
+	const DEFAULT_STYLE_CONFIG = {
+		varyWeight: false,    // randomly vary font-weight
+		varyItalic: false,    // randomly apply italic
+		varyCase: false,      // randomly apply small-caps
+		prependIcon: false,   // prepend random icon from iconSet
+		iconSet: '● ○ ◆ ◇ ■ □ ▲ △ ★ ☆ ♦ ♠ ♣ ♥ ☢ ☣ ☠ ⚙ ⬡ ⬢ ♻ ⚛ ⚠ ⛒',  // space-separated icons
 	};
 
 	// Helper to convert hex to HSL
@@ -105,6 +112,65 @@
 			s: Math.round(s * 100),
 			l: Math.round(l * 100)
 		};
+	}
+
+	// Convert camelCase to kebab-case
+	function toKebabCase(str) {
+		return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+	}
+
+	// Convert style object to CSS string
+	function stylesToCssString(styles, separator = '; ') {
+		return Object.entries(styles)
+			.map(([k, v]) => `${toKebabCase(k)}: ${v}`)
+			.join(separator);
+	}
+
+	// Parse any color string to HSL object
+	function parseColorToHsl(color) {
+		if (!color) return null;
+		// Try HSL format
+		const hslMatch = color.match(/hsl\((\d+),\s*(\d+)%?,\s*(\d+)%?\)/);
+		if (hslMatch) {
+			return { h: +hslMatch[1], s: +hslMatch[2], l: +hslMatch[3] };
+		}
+		// Try hex format
+		if (color.startsWith('#')) {
+			return hexToHsl(color);
+		}
+		return null;
+	}
+
+	// Clamp a hue value to the effective range
+	function clampHueToRange(hue, minHue, maxHue) {
+		// Handle wrap-around ranges (e.g., 300-60 wraps through 0)
+		if (minHue <= maxHue) {
+			// Normal range, clamp to nearest boundary
+			if (hue >= minHue && hue <= maxHue) return hue;
+			// Find which boundary is closer
+			const distToMin = Math.min(Math.abs(hue - minHue), 360 - Math.abs(hue - minHue));
+			const distToMax = Math.min(Math.abs(hue - maxHue), 360 - Math.abs(hue - maxHue));
+			return distToMin < distToMax ? minHue : maxHue;
+		} else {
+			// Wrap-around range (e.g., 300-60 means 300-360 and 0-60)
+			if (hue >= minHue || hue <= maxHue) return hue;
+			// Find which boundary is closer
+			const distToMin = Math.min(Math.abs(hue - minHue), 360 - Math.abs(hue - minHue));
+			const distToMax = Math.min(Math.abs(hue - maxHue), 360 - Math.abs(hue - maxHue));
+			return distToMin < distToMax ? minHue : maxHue;
+		}
+	}
+
+	// Clamp a color to the effective config range
+	function clampColorToRange(color, effectiveConfig) {
+		const hsl = parseColorToHsl(color);
+		if (!hsl) return color; // Can't parse, return as-is
+
+		const clampedHue = clampHueToRange(hsl.h, effectiveConfig.minHue, effectiveConfig.maxHue);
+		const clampedSat = Math.max(effectiveConfig.minSaturation, Math.min(effectiveConfig.maxSaturation, hsl.s));
+		const clampedLit = Math.max(effectiveConfig.minLightness, Math.min(effectiveConfig.maxLightness, hsl.l));
+
+		return `hsl(${clampedHue}, ${clampedSat}%, ${clampedLit}%)`;
 	}
 
 	// Get background lightness from site theme or CSS variable
@@ -231,6 +297,21 @@
 		GM_setValue('colorConfig', JSON.stringify(colorConfig));
 	}
 
+	// Load saved style config or use defaults
+	let styleConfig = { ...DEFAULT_STYLE_CONFIG };
+	try {
+		const savedStyleConfig = GM_getValue('styleConfig', null);
+		if (savedStyleConfig) {
+			styleConfig = { ...DEFAULT_STYLE_CONFIG, ...JSON.parse(savedStyleConfig) };
+		}
+	} catch (e) {
+		console.error('[Nick Colors] Failed to load style config:', e);
+	}
+
+	function saveStyleConfig() {
+		GM_setValue('styleConfig', JSON.stringify(styleConfig));
+	}
+
 	// CSS selectors for finding username links
 	// Add more selectors as needed for different parts of the site
 	const USERNAME_SELECTORS = [
@@ -293,70 +374,135 @@
 	}
 
 	function generateStyles(username) {
+		let styles = {};
+		let lightness = null; // Track lightness for contrast check
+		const effectiveConfig = getEffectiveColorConfig();
+
 		// Check user-saved overrides first (takes precedence over manual)
 		if (customNickColors[username]) {
 			const custom = customNickColors[username];
 			if (typeof custom === 'string') {
-				return { color: custom };
+				styles = { color: clampColorToRange(custom, effectiveConfig) };
+			} else {
+				styles = { ...custom };
+				// Clamp color to effective range (but preserve original in storage)
+				if (styles.color) {
+					styles.color = clampColorToRange(styles.color, effectiveConfig);
+				}
 			}
-			return { ...custom };
 		}
 		// Then check hardcoded manual overrides
-		if (MANUAL_OVERRIDES[username]) {
+		else if (MANUAL_OVERRIDES[username]) {
 			const override = MANUAL_OVERRIDES[username];
 			if (typeof override === 'string') {
-				return { color: override };
+				styles = { color: clampColorToRange(override, effectiveConfig) };
+			} else {
+				styles = { ...override };
+				if (styles.color) {
+					styles.color = clampColorToRange(styles.color, effectiveConfig);
+				}
 			}
-			return { ...override };
+		}
+		// Generate from hash
+		else {
+			// Generate from hash - use different parts of the hash for each property
+			const hash = hashString(username);
+			const hash2 = hashString(username + '_sat');
+			const hash3 = hashString(username + '_lit');
+
+			// Hue range (with wrap-around support)
+			let hueRange = effectiveConfig.maxHue - effectiveConfig.minHue;
+			if (hueRange <= 0) hueRange += 360;
+			let hue = effectiveConfig.minHue + (hash % hueRange);
+			if (hue >= 360) hue -= 360;
+
+			// Avoid excluded ranges by shifting
+			let attempts = 0;
+			while (isHueExcluded(hue, effectiveConfig) && attempts < 36) {
+				hue = (hue + 10) % 360;
+				attempts++;
+			}
+
+			// Saturation range
+			const satRange = effectiveConfig.maxSaturation - effectiveConfig.minSaturation;
+			const saturation = effectiveConfig.minSaturation + (hash2 % Math.max(1, satRange + 1));
+
+			// Lightness range
+			const litRange = effectiveConfig.maxLightness - effectiveConfig.minLightness;
+			lightness = effectiveConfig.minLightness + (hash3 % Math.max(1, litRange + 1));
+
+			styles = {
+				color: `hsl(${hue}, ${saturation}%, ${lightness}%)`
+			};
+
+			// Invert colors if contrast is below threshold
+			const threshold = effectiveConfig.contrastThreshold || 0;
+			if (threshold > 0) {
+				const bgLightness = getBackgroundLightness();
+				const contrast = Math.abs(lightness - bgLightness);
+				if (contrast < threshold) {
+					// Swap: color becomes background, use page background as text
+					styles.backgroundColor = styles.color;
+					styles.color = 'var(--color-bg, #000)';
+					styles.padding = '0 0.25em';
+				}
+			}
 		}
 
-		// Get effective config (with site theme overrides applied)
-		const effectiveConfig = getEffectiveColorConfig();
-
-		// Generate from hash - use different parts of the hash for each property
-		const hash = hashString(username);
-		const hash2 = hashString(username + '_sat');
-		const hash3 = hashString(username + '_lit');
-
-		// Hue range (with wrap-around support)
-		let hueRange = effectiveConfig.maxHue - effectiveConfig.minHue;
-		if (hueRange <= 0) hueRange += 360;
-		let hue = effectiveConfig.minHue + (hash % hueRange);
-		if (hue >= 360) hue -= 360;
-
-		// Avoid excluded ranges by shifting
-		let attempts = 0;
-		while (isHueExcluded(hue, effectiveConfig) && attempts < 36) {
-			hue = (hue + 10) % 360;
-			attempts++;
+		// Apply style variations based on hash (unless already set by override)
+		const hash4 = hashString(username + '_style');
+		if (styleConfig.varyWeight && !styles.fontWeight) {
+			styles.fontWeight = (hash4 % 2 === 0) ? 'normal' : 'bold';
 		}
-
-		// Saturation range
-		const satRange = effectiveConfig.maxSaturation - effectiveConfig.minSaturation;
-		const saturation = effectiveConfig.minSaturation + (hash2 % Math.max(1, satRange + 1));
-
-		// Lightness range
-		const litRange = effectiveConfig.maxLightness - effectiveConfig.minLightness;
-		const lightness = effectiveConfig.minLightness + (hash3 % Math.max(1, litRange + 1));
-
-		const styles = {
-			color: `hsl(${hue}, ${saturation}%, ${lightness}%)`
-		};
-
-		// Invert colors if contrast is below threshold
-		const threshold = effectiveConfig.contrastThreshold || 0;
-		if (threshold > 0) {
-			const bgLightness = getBackgroundLightness();
-			const contrast = Math.abs(lightness - bgLightness);
-			if (contrast < threshold) {
-				// Swap: color becomes background, use page background as text
-				styles.backgroundColor = styles.color;
-				styles.color = 'var(--color-bg, #000)';
-				styles.padding = '0 0.25em';
-			}
+		if (styleConfig.varyItalic && !styles.fontStyle) {
+			styles.fontStyle = (hash4 % 4 === 0) ? 'italic' : 'normal';
+		}
+		if (styleConfig.varyCase && !styles.fontVariant) {
+			styles.fontVariant = (hash4 % 4 === 1) ? 'small-caps' : 'normal';
 		}
 
 		return styles;
+	}
+
+	/**
+	 * Get hash-based icon for a username (ignores overrides, for display defaults)
+	 */
+	function getHashBasedIcon(username, config = styleConfig) {
+		if (!config.prependIcon || !config.iconSet) return null;
+		const icons = config.iconSet.split(/\s+/).filter(Boolean);
+		if (icons.length === 0) return null;
+		const hash = hashString(username + '_icon');
+		return icons[hash % icons.length];
+	}
+
+	/**
+	 * Get hash-based style variations for a username
+	 */
+	function getHashBasedStyleVariations(username) {
+		const hash = hashString(username + '_style');
+		return {
+			fontWeight: (hash % 2 === 0) ? 'normal' : 'bold',
+			fontStyle: (hash % 4 === 0) ? 'italic' : 'normal',
+			fontVariant: (hash % 4 === 1) ? 'small-caps' : 'normal'
+		};
+	}
+
+	/**
+	 * Get a consistent icon for a username based on hash or custom override
+	 * Returns: string (icon) or null (no icon)
+	 */
+	function getIconForUsername(username) {
+		// Check for user-specific custom icon first (including explicitly disabled with '')
+		if (customNickColors[username] && 'icon' in customNickColors[username]) {
+			const icon = customNickColors[username].icon;
+			// Empty string means explicitly disabled - return null to show no icon
+			return icon || null;
+		}
+		if (MANUAL_OVERRIDES[username]?.icon) {
+			return MANUAL_OVERRIDES[username].icon;
+		}
+		// Fall back to hash-based icon if enabled
+		return getHashBasedIcon(username);
 	}
 
 	function applyStyles(element, username) {
@@ -385,6 +531,28 @@
 		Object.assign(element.style, styles);
 		element.dataset.nickColored = 'true';
 		element.dataset.username = username;
+
+		// Prepend icon if enabled
+		const icon = getIconForUsername(username);
+		if (icon) {
+			if (!element.dataset.iconApplied) {
+				// Store original text before first icon application
+				element.dataset.originalText = element.textContent;
+				element.dataset.iconApplied = 'true';
+				element.textContent = icon + ' ' + element.textContent;
+			} else {
+				// Icon already applied - update it in case it changed
+				const originalText = element.dataset.originalText || element.textContent;
+				element.textContent = icon + ' ' + originalText;
+			}
+		} else if (element.dataset.iconApplied) {
+			// Icon was removed - restore original text
+			if (element.dataset.originalText) {
+				element.textContent = element.dataset.originalText;
+			}
+			delete element.dataset.iconApplied;
+			delete element.dataset.originalText;
+		}
 	}
 
 	// =====================================================
@@ -413,8 +581,13 @@
 		}
 
 		// From text content (fallback)
-		const text = element.textContent.trim();
-		if (text && text.length < 30 && !text.includes(' ')) {
+		let text = element.textContent.trim();
+		// If text has a space (possibly from icon prefix), try the last part
+		if (text.includes(' ')) {
+			const parts = text.split(' ');
+			text = parts[parts.length - 1]; // Take the last part (username after icon)
+		}
+		if (text && text.length < 30) {
 		  	//if starts with @ remove
 		  	if(text.startsWith('@')) return text.slice(1);
 			return text;
@@ -427,9 +600,16 @@
 		// Skip already processed
 		if (element.dataset.nickColored) return false;
 
-		// Skip if text content contains spaces (not a username)
+		// Check text content - if it has a space, only allow if it looks like "icon username"
 		const text = element.textContent.trim();
-		if (text.includes(' ')) return false;
+		if (text.includes(' ')) {
+			// Only accept if it's exactly 2 parts and second part looks like username
+			const parts = text.split(' ');
+			if (parts.length !== 2 || parts[1].includes(' ') || parts[1].length === 0) {
+				return false;
+			}
+			// If we get here, it might be "icon username" format - allow it
+		}
 
 		// Skip obvious non-usernames
 		const href = element.getAttribute('href') || '';
@@ -577,9 +757,12 @@
 
 				// Create colored span for the mention
 				const span = document.createElement('span');
-				span.textContent = m.full;
+				// Prepend icon if enabled
+				const icon = getIconForUsername(m.username);
+				span.textContent = icon ? icon + ' ' + m.full : m.full;
 				span.dataset.mentionColored = 'true';
 				span.dataset.username = m.username;
+				if (icon) span.dataset.iconApplied = 'true';
 
 				// Apply styles
 				const styles = generateStyles(m.username);
@@ -875,6 +1058,27 @@
 		.nc-dialog-content {
 			padding: 0.5rem 1rem; overflow-y: auto; flex: 1;
 		}
+		.nc-dialog-preview {
+			padding: 0.5rem 1rem;
+			border-bottom: 1px solid var(--color-border, #333);
+			flex-shrink: 0;
+			background: var(--color-bg, #0a0a0a);
+		}
+		.nc-dialog-preview .preview,
+		.nc-dialog-preview .preview-row {
+			margin: 0;
+			background-color: var(--color-code-bg, #222);
+			border: 1px solid var(--color-border, #333);
+			padding: 0.5rem; 
+			margin: 0.75rem 0;
+			font-size: 0.875rem; 
+		}
+		.nc-dialog .preview-row {
+			display: flex; 
+			gap: 0.5rem; 
+			flex-wrap: wrap; 
+		}
+		.nc-dialog .preview-nick { padding: 0.125rem 0.25rem; }
 		.nc-dialog-footer {
 			padding: 0.5rem 1rem .5rem; 
 			border-top: 1px solid var(--color-border, #333);
@@ -960,16 +1164,6 @@
 		.nc-dialog textarea { min-height: 70px; resize: vertical; }
 		.nc-dialog .nc-toggle { display: flex; margin: 0.5rem 0; }
 		.nc-dialog .hint { font-size: 0.625rem; color: var(--color-fg-dim, #666); margin-top: 0.25rem; }
-		.nc-dialog .preview {
-			font-size: 0.875rem; margin: 0.75rem 0; padding: 0.5rem;
-			border: 1px solid var(--color-border, #333);
-			background-color: var(--color-code-bg, #222);
-		}
-		.nc-dialog .preview-row {
-			display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0;
-			padding: 0.5rem; border: 1px solid var(--color-border, #333);
-		}
-		.nc-dialog .preview-nick { padding: 0.125rem 0.25rem; }
 		.nc-dialog .nc-dialog-attribution {
 			width: 100%;
 			border-top: 1px dotted var(--color-border, #333);
@@ -985,11 +1179,11 @@
 
 	/**
 	 * Creates a dialog with standard structure
-	 * @param {Object} opts - { title, content, buttons, width, onClose, onSettings }
+	 * @param {Object} opts - { title, content, buttons, width, onClose, onSettings, preview }
 	 * @returns {Object} - { el, close, querySelector, querySelectorAll }
 	 */
 	function createDialog(opts) {
-		const { title, content, buttons = [], width = '400px', onClose, onSettings } = opts;
+		const { title, content, buttons = [], width = '400px', onClose, onSettings, preview = '' } = opts;
 
 		const overlay = document.createElement('div');
 		overlay.className = 'nc-dialog-overlay';
@@ -1001,6 +1195,7 @@
 					${onSettings ? '<button class="nc-header-settings link-brackets"><span class="inner">SETTINGS</span></button>' : ''}
 					<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 				</div>
+				${preview ? `<div class="nc-dialog-preview">${preview}</div>` : ''}
 				<div class="nc-dialog-content">
 					${content}
 				</div>
@@ -1065,37 +1260,148 @@
 	// =====================================================
 
 	function createColorPicker(username, currentStyles) {
-		const currentCssString = Object.entries(currentStyles)
-			.filter(([key]) => key !== 'color')
-			.map(([key, value]) => {
-				const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-				return `${cssKey}: ${value};`;
-			})
-			.join('\n');
+		// Filter out color, icon, and style variation properties from CSS string
+		const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant'];
+		const filteredStyles = Object.fromEntries(
+			Object.entries(currentStyles).filter(([key]) => !styleVariationKeys.includes(key))
+		);
+		const currentCssString = stylesToCssString(filteredStyles, ';\n');
+
+		// Get current custom icon state: undefined = auto, '' = disabled, string = custom
+		const savedIcon = customNickColors[username]?.icon;
+		const currentIcon = savedIcon || '';
+		// Determine icon state: null = auto (use global), false = disabled, true = custom
+		const hasIconProperty = customNickColors[username] && 'icon' in customNickColors[username];
+		const initialIconState = !hasIconProperty ? null : (savedIcon ? true : false);
+
+		// Calculate hash-based defaults for display
+		const hashIcon = getHashBasedIcon(username) || '';
+		const hashStyles = getHashBasedStyleVariations(username);
+		const hashWeight = hashStyles.fontWeight;
+		const hashItalic = hashStyles.fontStyle;
+		const hashCase = hashStyles.fontVariant;
+
+		// Get current per-user style overrides (null means use global/hash)
+		const savedStyles = customNickColors[username] || {};
+		const currentWeight = savedStyles.fontWeight;
+		const currentItalic = savedStyles.fontStyle;
+		const currentCase = savedStyles.fontVariant;
+
+		// Check if user has remote overrides
+		const hasRemoteOverride = MANUAL_OVERRIDES[username];
+		let remoteOverrideText = '';
+		if (hasRemoteOverride) {
+			const override = MANUAL_OVERRIDES[username];
+			if (typeof override === 'string') {
+				remoteOverrideText = `color: ${override}`;
+			} else {
+				remoteOverrideText = stylesToCssString(override);
+			}
+		}
+
+		// Check if color range is clamped
+		const eff = getEffectiveColorConfig();
+		const isHueClamped = eff.minHue !== 0 || eff.maxHue !== 360;
+		const isSatClamped = eff.minSaturation !== 0 || eff.maxSaturation !== 100;
+		const isLitClamped = eff.minLightness !== 0 || eff.maxLightness !== 100;
+		const isClamped = isHueClamped || isSatClamped || isLitClamped;
 
 		const dialog = createDialog({
 			title: `Nick: ${username}`,
 			width: '320px',
 			onSettings: () => createSettingsPanel(),
+			preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message<br />Inline mention @${username} example</div>`,
 			content: `
-				<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Sample message</div>
-				<hr />
+				${hasRemoteOverride ? `<div class="hint" style="margin-bottom: 0.5rem;">Site-wide override: <code style="background: var(--color-code-bg, #222); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
 				<h4>Nick Color</h4>
 				<div id="picker-sliders"></div>
 				<div class="nc-input-row-stacked no-padding-bottom">
 					<label>Custom color value:</label>
 					<input type="text" id="picker-custom" placeholder="#ff6b6b or hsl(280, 90%, 65%)">
 				</div>
+				${isClamped ? `<div class="hint" style="margin-top: 0.5rem;">Color range is restricted. Preview shows clamped result. Click SETTINGS to adjust.</div>` : ''}
+				<hr />
+				<h4>Custom Icon</h4>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
+					<label class="text-fg text-sm">Custom icon ${hashIcon ? `<span class="text-fg-dim">(default: ${hashIcon})</span>` : ''}</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${initialIconState === true ? 'true' : initialIconState === false ? 'false' : 'auto'}</div>
+						<input type="checkbox" id="picker-icon-enabled" class="sr-only" ${initialIconState === true ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${initialIconState === true ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${initialIconState === true ? '1.25rem' : initialIconState === false ? '0.125rem' : '0.625rem'})"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row-stacked no-padding-top" id="picker-icon-container" style="display: ${initialIconState === true ? 'block' : 'none'}">
+					${styleConfig.iconSet ? `<div id="picker-icon-options" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: 3px; transition: background 0.15s, border-color 0.15s;" title="Click to copy">${icon}</span>`).join('')}</div>` : ''}
+					<input type="text" id="picker-icon" value="${currentIcon}" placeholder="click above or enter your own">
+					<div class="hint">Single character/emoji prepended to this user's name</div>
+				</div>
+				<hr />
+				<h4>Style Variations</h4>
+				<div class="hint" style="margin-bottom: 0.5rem;">Override the global style settings for this user</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
+					<label class="text-fg text-sm">Bold <span class="text-fg-dim">(default: ${hashWeight})</span></label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${currentWeight === 'bold' ? 'true' : currentWeight === 'normal' ? 'false' : 'auto'}</div>
+						<input type="checkbox" id="picker-weight" class="sr-only" ${currentWeight === 'bold' ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${currentWeight === 'bold' ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${currentWeight === 'bold' ? '1.25rem' : currentWeight === 'normal' ? '0.125rem' : '0.625rem'})"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
+					<label class="text-fg text-sm">Italic <span class="text-fg-dim">(default: ${hashItalic})</span></label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${currentItalic === 'italic' ? 'true' : currentItalic === 'normal' ? 'false' : 'auto'}</div>
+						<input type="checkbox" id="picker-italic" class="sr-only" ${currentItalic === 'italic' ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${currentItalic === 'italic' ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${currentItalic === 'italic' ? '1.25rem' : currentItalic === 'normal' ? '0.125rem' : '0.625rem'})"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle no-padding-top">
+					<label class="text-fg text-sm">Small Caps <span class="text-fg-dim">(default: ${hashCase})</span></label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${currentCase === 'small-caps' ? 'true' : currentCase === 'normal' ? 'false' : 'auto'}</div>
+						<input type="checkbox" id="picker-case" class="sr-only" ${currentCase === 'small-caps' ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${currentCase === 'small-caps' ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${currentCase === 'small-caps' ? '1.25rem' : currentCase === 'normal' ? '0.125rem' : '0.625rem'})"></div>
+						</div>
+					</label>
+				</div>
 				<hr />
 				<h4>Additional CSS</h4>
 				<div class="nc-input-row-stacked no-padding-top">
-					<textarea id="picker-css" placeholder="background-color: #1a1a2e;&#10;font-weight: bold;">${currentCssString}</textarea>
+					<textarea id="picker-css" placeholder="background-color: #1a1a2e;&#10;text-decoration: underline;">${currentCssString}</textarea>
 					<div class="hint">CSS properties, one per line</div>
 				</div>
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
 					const styles = { color: getTextColor(), ...parseCssText(cssInput.value) };
+					// Add custom icon based on tri-state: null = auto (don't save), true = custom, false = disabled
+					if (iconState === true) {
+						const iconValue = iconInput.value.trim();
+						if (iconValue) {
+							styles.icon = iconValue;
+						} else {
+							styles.icon = ''; // Explicitly set but empty - will be treated as disabled
+						}
+					} else if (iconState === false) {
+						styles.icon = ''; // Explicitly disabled
+					}
+					// iconState === null means auto, so we don't save the icon property
+					// Add style variations if explicitly set (not auto)
+					if (weightState !== null) {
+						styles.fontWeight = weightState ? 'bold' : 'normal';
+					}
+					if (italicState !== null) {
+						styles.fontStyle = italicState ? 'italic' : 'normal';
+					}
+					if (caseState !== null) {
+						styles.fontVariant = caseState ? 'small-caps' : 'normal';
+					}
 					customNickColors[username] = styles;
 					saveCustomNickColors();
 					refreshAllColors();
@@ -1113,8 +1419,20 @@
 
 		const preview = dialog.querySelector('#picker-preview');
 		const customInput = dialog.querySelector('#picker-custom');
+		const iconEnabledInput = dialog.querySelector('#picker-icon-enabled');
+		const iconContainer = dialog.querySelector('#picker-icon-container');
+		const iconInput = dialog.querySelector('#picker-icon');
+		const weightInput = dialog.querySelector('#picker-weight');
+		const italicInput = dialog.querySelector('#picker-italic');
+		const caseInput = dialog.querySelector('#picker-case');
 		const cssInput = dialog.querySelector('#picker-css');
 		const slidersContainer = dialog.querySelector('#picker-sliders');
+
+		// Track tri-state for toggles (null = auto/inherit, true = on, false = off)
+		let iconState = initialIconState;
+		let weightState = currentWeight === 'bold' ? true : currentWeight === 'normal' ? false : null;
+		let italicState = currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null;
+		let caseState = currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null;
 
 		// Parse CSS text into style object
 		function parseCssText(cssText) {
@@ -1160,35 +1478,153 @@
 		function updatePreview() {
 			updateGradients();
 			const color = getTextColor();
+			// Show clamped color in preview (what it will actually look like)
+			const effectiveConfig = getEffectiveColorConfig();
+			const clampedColor = clampColorToRange(color, effectiveConfig);
 			preview.style.cssText = '';
-			preview.style.color = color;
+			preview.style.color = clampedColor;
 			Object.assign(preview.style, parseCssText(cssInput.value));
+
+			// Apply style variations based on state (null = use global/hash default)
+			const effectiveWeight = weightState !== null ? (weightState ? 'bold' : 'normal') :
+				(styleConfig.varyWeight ? hashWeight : 'normal');
+			const effectiveItalic = italicState !== null ? (italicState ? 'italic' : 'normal') :
+				(styleConfig.varyItalic ? hashItalic : 'normal');
+			const effectiveCase = caseState !== null ? (caseState ? 'small-caps' : 'normal') :
+				(styleConfig.varyCase ? hashCase : 'normal');
+			preview.style.fontWeight = effectiveWeight;
+			preview.style.fontStyle = effectiveItalic;
+			preview.style.fontVariant = effectiveCase;
+
+			// Show icon in preview based on tri-state: true = custom, false = disabled, null = auto (global)
+			let iconValue = '';
+			if (iconState === true) {
+				iconValue = iconInput.value.trim();
+			} else if (iconState === null) {
+				// Auto - use global hash-based icon if enabled
+				iconValue = hashIcon;
+			}
+			// iconState === false means explicitly disabled, so iconValue stays empty
+			preview.textContent = iconValue ? iconValue + ' ' + username : username;
 		}
 
 		// Parse initial color
 		if (currentStyles.color) {
-			const m = currentStyles.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-			if (m) {
-				hueSlider.setValue(+m[1]); satSlider.setValue(+m[2]); litSlider.setValue(+m[3]);
+			const hsl = parseColorToHsl(currentStyles.color);
+			if (hsl) {
+				hueSlider.setValue(hsl.h); satSlider.setValue(hsl.s); litSlider.setValue(hsl.l);
 			} else {
 				customInput.value = currentStyles.color;
 			}
 		}
 
 		customInput.addEventListener('input', updatePreview);
+		iconInput.addEventListener('input', updatePreview);
 		cssInput.addEventListener('input', updatePreview);
+
+		// Icon toggle handler (tri-state like style variations)
+		iconEnabledInput.closest('label').addEventListener('click', (e) => {
+			e.preventDefault();
+			iconState = cycleTriState(iconState);
+			updateTriStateToggle(iconEnabledInput, iconState);
+			// Show/hide icon input (only show when state is true/custom)
+			iconContainer.style.display = iconState === true ? 'block' : 'none';
+			updatePreview();
+		});
+
+		// Icon option click handlers - click to select
+		const iconOptions = dialog.querySelector('#picker-icon-options');
+		if (iconOptions) {
+			iconOptions.addEventListener('click', (e) => {
+				const option = e.target.closest('.nc-icon-option');
+				if (option) {
+					const icon = option.textContent;
+					iconInput.value = icon;
+					updatePreview();
+					// Brief visual feedback
+					option.style.background = 'var(--color-fg-dim, #666)';
+					setTimeout(() => { option.style.background = ''; }, 150);
+				}
+			});
+		}
+
+		// Tri-state toggle helper: null (auto) → true → false → null (auto)
+		function cycleTriState(currentState) {
+			if (currentState === null) return true;
+			if (currentState === true) return false;
+			return null;
+		}
+
+		function updateTriStateToggle(input, state) {
+			const label = input.closest('.nc-toggle');
+			const valueEl = label.querySelector('.nc-toggle-value');
+			const track = label.querySelector('.nc-toggle-track');
+			const thumb = label.querySelector('.nc-toggle-thumb');
+
+			// Update value text
+			if (valueEl) valueEl.textContent = state === true ? 'true' : state === false ? 'false' : 'auto';
+
+			// Update track color
+			if (track) {
+				track.classList.remove('bg-fg', 'bg-fg-dim');
+				track.classList.add(state === true ? 'bg-fg' : 'bg-fg-dim');
+			}
+
+			// Update thumb position: left (false/0.125rem), middle (auto/0.625rem), right (true/1.25rem)
+			if (thumb) {
+				const pos = state === true ? '1.25rem' : state === false ? '0.125rem' : '0.625rem';
+				thumb.style.transform = `translateX(${pos})`;
+			}
+		}
+
+		// Style variation toggle handlers (tri-state)
+		if (weightInput) {
+			weightInput.closest('label').addEventListener('click', (e) => {
+				e.preventDefault();
+				weightState = cycleTriState(weightState);
+				updateTriStateToggle(weightInput, weightState);
+				updatePreview();
+			});
+		}
+		if (italicInput) {
+			italicInput.closest('label').addEventListener('click', (e) => {
+				e.preventDefault();
+				italicState = cycleTriState(italicState);
+				updateTriStateToggle(italicInput, italicState);
+				updatePreview();
+			});
+		}
+		if (caseInput) {
+			caseInput.closest('label').addEventListener('click', (e) => {
+				e.preventDefault();
+				caseState = cycleTriState(caseState);
+				updateTriStateToggle(caseInput, caseState);
+				updatePreview();
+			});
+		}
+
 		updatePreview();
 	}
 
 	function refreshAllColors() {
 		document.querySelectorAll('[data-nick-colored]').forEach(el => {
+			// Restore original text if we have it stored
+			if (el.dataset.originalText) {
+				el.textContent = el.dataset.originalText;
+			}
+			// Clear all our data attributes
 			delete el.dataset.nickColored;
+			delete el.dataset.iconApplied;
+			delete el.dataset.originalText;
+			delete el.dataset.username;
 			el.style.cssText = ''; // Clear applied styles
 		});
 		// Remove mention spans and restore original text
 		document.querySelectorAll('[data-mention-colored]').forEach(el => {
-			const text = el.textContent;
-			el.replaceWith(document.createTextNode(text));
+			// Reconstruct original mention from stored username (avoids including icon)
+			const username = el.dataset.username;
+			const originalText = username ? `@${username}` : el.textContent;
+			el.replaceWith(document.createTextNode(originalText));
 		});
 		colorizeAll();
 	}
@@ -1201,10 +1637,8 @@
 		const dialog = createDialog({
 			title: 'Nick Color Settings',
 			width: '400px',
+			preview: `<div class="preview-row" id="settings-preview"></div>`,
 			content: `
-				<h4>Preview</h4>
-				<div class="preview preview-row" id="settings-preview"></div>
-				<hr />
 				<div class="nc-input-row-stacked">
 					<label for="settings-preset">Preset Theme:</label>
 					<select id="settings-preset">
@@ -1258,14 +1692,65 @@
 					Reverse foreground and background when lightness contrast is below threshold (0 = disabled)
 				</div>
 				<div id="contrast-slider-container"></div>
+				<hr />
+				<h4>Style Variation</h4>
+				<div class="hint" style="margin-top: -0.25rem; margin-bottom: 0.25rem;">
+					Add non-color variation to usernames (useful for limited color ranges)
+				</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Vary font weight</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.varyWeight ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-vary-weight" class="sr-only" ${styleConfig.varyWeight ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.varyWeight ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.varyWeight ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Vary italic</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.varyItalic ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-vary-italic" class="sr-only" ${styleConfig.varyItalic ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.varyItalic ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.varyItalic ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Vary small-caps</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.varyCase ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-vary-case" class="sr-only" ${styleConfig.varyCase ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.varyCase ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.varyCase ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row flex items-center justify-between gap-4 nc-toggle">
+					<label class="text-fg text-sm">Prepend icon</label>
+					<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
+						<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${styleConfig.prependIcon ? 'true' : 'false'}</div>
+						<input type="checkbox" id="settings-prepend-icon" class="sr-only" ${styleConfig.prependIcon ? 'checked' : ''}>
+						<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${styleConfig.prependIcon ? 'bg-fg' : 'bg-fg-dim'}">
+							<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${styleConfig.prependIcon ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+						</div>
+					</label>
+				</div>
+				<div class="nc-input-row-stacked" id="icon-set-container" style="display: ${styleConfig.prependIcon ? 'block' : 'none'}">
+					<label class="text-fg text-sm">Icon set (space-separated)</label>
+					<input type="text" id="settings-icon-set" value="${styleConfig.iconSet}" placeholder="● ○ ◆ ◇ ■ □ ▲ △ ★ ☆">
+				</div>
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
 					const s = getSettings();
 					colorConfig = s.color;
 					siteThemeConfig = s.siteTheme;
+					styleConfig = s.style;
 					saveColorConfig();
 					saveSiteThemeConfig();
+					saveStyleConfig();
 					refreshAllColors();
 					close();
 				}},
@@ -1278,6 +1763,12 @@
 					if (siteHueInput) siteHueInput.checked = DEFAULT_SITE_THEME_CONFIG.useHueRange;
 					if (siteSaturationInput) siteSaturationInput.checked = DEFAULT_SITE_THEME_CONFIG.useSaturation;
 					if (siteLightnessInput) siteLightnessInput.checked = DEFAULT_SITE_THEME_CONFIG.useLightness;
+					if (varyWeightInput) varyWeightInput.checked = DEFAULT_STYLE_CONFIG.varyWeight;
+					if (varyItalicInput) varyItalicInput.checked = DEFAULT_STYLE_CONFIG.varyItalic;
+					if (varyCaseInput) varyCaseInput.checked = DEFAULT_STYLE_CONFIG.varyCase;
+					if (prependIconInput) prependIconInput.checked = DEFAULT_STYLE_CONFIG.prependIcon;
+					if (iconSetInput) iconSetInput.value = DEFAULT_STYLE_CONFIG.iconSet;
+					if (iconSetContainer) iconSetContainer.style.display = DEFAULT_STYLE_CONFIG.prependIcon ? 'block' : 'none';
 					presetSelect.value = '';
 					updatePreview();
 				}},
@@ -1332,6 +1823,12 @@
 		const siteHueInput = dialog.querySelector('#settings-site-hue');
 		const siteSaturationInput = dialog.querySelector('#settings-site-saturation');
 		const siteLightnessInput = dialog.querySelector('#settings-site-lightness');
+		const varyWeightInput = dialog.querySelector('#settings-vary-weight');
+		const varyItalicInput = dialog.querySelector('#settings-vary-italic');
+		const varyCaseInput = dialog.querySelector('#settings-vary-case');
+		const prependIconInput = dialog.querySelector('#settings-prepend-icon');
+		const iconSetInput = dialog.querySelector('#settings-icon-set');
+		const iconSetContainer = dialog.querySelector('#icon-set-container');
 
 		function getSettings() {
 			const [minHue, maxHue] = hueSlider.getValues();
@@ -1339,7 +1836,8 @@
 			const [minLightness, maxLightness] = litSlider.getValues();
 			return {
 				color: { minHue, maxHue, minSaturation, maxSaturation, minLightness, maxLightness, excludeRanges: colorConfig.excludeRanges, contrastThreshold: contrastSlider.getValue() },
-				siteTheme: { useHueRange: siteHueInput?.checked || false, hueSpread: hueSpreadSlider.getValue(), useSaturation: siteSaturationInput?.checked || false, useLightness: siteLightnessInput?.checked || false }
+				siteTheme: { useHueRange: siteHueInput?.checked || false, hueSpread: hueSpreadSlider.getValue(), useSaturation: siteSaturationInput?.checked || false, useLightness: siteLightnessInput?.checked || false },
+				style: { varyWeight: varyWeightInput?.checked || false, varyItalic: varyItalicInput?.checked || false, varyCase: varyCaseInput?.checked || false, prependIcon: prependIconInput?.checked || false, iconSet: iconSetInput?.value || '' }
 			};
 		}
 
@@ -1377,35 +1875,46 @@
 				const username = previewNames[i];
 
 				// Check for overrides first (same logic as generateStyles)
+				const s = getSettings().style;
+				const hashStyles = getHashBasedStyleVariations(username);
+
 				if (customNickColors[username] || MANUAL_OVERRIDES[username]) {
 					const styles = generateStyles(username);
 					el.style.cssText = '';
 					Object.assign(el.style, styles);
-					return;
+				} else {
+					// Generate from hash using current settings
+					const hash = hashString(username);
+					const hash2 = hashString(username + '_sat');
+					const hash3 = hashString(username + '_lit');
+					let range = eff.maxHue - eff.minHue; if (range <= 0) range += 360;
+					let hue = eff.minHue + (hash % Math.max(1, range)); if (hue >= 360) hue -= 360;
+					const satRange = eff.maxSaturation - eff.minSaturation;
+					const sat = eff.minSaturation + (hash2 % Math.max(1, satRange + 1));
+					const litRange = eff.maxLightness - eff.minLightness;
+					const lit = eff.minLightness + (hash3 % Math.max(1, litRange + 1));
+					const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
+					// Invert colors if contrast is below threshold
+					const threshold = eff.contrastThreshold || 0;
+					if (threshold > 0 && Math.abs(lit - bgLightness) < threshold) {
+						el.style.backgroundColor = color;
+						el.style.color = 'var(--color-bg, #000)';
+						el.style.padding = '0 0.25em';
+					} else {
+						el.style.color = color;
+						el.style.backgroundColor = '';
+						el.style.padding = '';
+					}
+
+					// Apply style variations based on current toggle states
+					el.style.fontWeight = s.varyWeight ? hashStyles.fontWeight : '';
+					el.style.fontStyle = s.varyItalic ? hashStyles.fontStyle : '';
+					el.style.fontVariant = s.varyCase ? hashStyles.fontVariant : '';
 				}
 
-				// Generate from hash using current settings
-				const hash = hashString(username);
-				const hash2 = hashString(username + '_sat');
-				const hash3 = hashString(username + '_lit');
-				let range = eff.maxHue - eff.minHue; if (range <= 0) range += 360;
-				let hue = eff.minHue + (hash % Math.max(1, range)); if (hue >= 360) hue -= 360;
-				const satRange = eff.maxSaturation - eff.minSaturation;
-				const sat = eff.minSaturation + (hash2 % Math.max(1, satRange + 1));
-				const litRange = eff.maxLightness - eff.minLightness;
-				const lit = eff.minLightness + (hash3 % Math.max(1, litRange + 1));
-				const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
-				// Invert colors if contrast is below threshold
-				const threshold = eff.contrastThreshold || 0;
-				if (threshold > 0 && Math.abs(lit - bgLightness) < threshold) {
-					el.style.backgroundColor = color;
-					el.style.color = 'var(--color-bg, #000)';
-					el.style.padding = '0 0.25em';
-				} else {
-					el.style.color = color;
-					el.style.backgroundColor = '';
-					el.style.padding = '';
-				}
+				// Apply icon using helper
+				const icon = getHashBasedIcon(username, s);
+				el.textContent = icon ? icon + ' ' + username : username;
 			});
 		}
 
@@ -1520,6 +2029,27 @@
 				updatePreview();
 			});
 		});
+
+		// Style variation toggles
+		[varyWeightInput, varyItalicInput, varyCaseInput, prependIconInput].forEach(el => {
+			if (!el) return;
+			el.addEventListener('change', () => {
+				updateToggle(el);
+				updatePreview();
+			});
+		});
+
+		// Show/hide icon set input when prepend icon is toggled
+		if (prependIconInput) {
+			prependIconInput.addEventListener('change', () => {
+				if (iconSetContainer) iconSetContainer.style.display = prependIconInput.checked ? 'block' : 'none';
+			});
+		}
+
+		// Update preview when icon set changes
+		if (iconSetInput) {
+			iconSetInput.addEventListener('input', updatePreview);
+		}
 
 		// Set up hue spread change handler (defined earlier as empty, now assigned)
 		onHueSpreadChange = () => {

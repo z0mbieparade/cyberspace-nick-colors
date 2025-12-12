@@ -12,10 +12,12 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 
 - **Right-click any colored username** to customize its color
   - Set custom text color via sliders or hex/hsl value
-  - Add additional CSS (background, font-weight, etc.)
+  - Set custom icon (prepended character/emoji)
+  - Override style variations (bold, italic, small-caps) with tri-state toggles (auto/on/off)
+  - Add additional CSS (background, text-decoration, etc.)
   - Open global settings from the per-user dialog
 - **Greasemonkey menu** has options for:
-  - Nick Colors Settings (global color/glow settings)
+  - Nick Colors Settings (global color/style settings)
   - Refresh Nick Colors
   - Clear All Custom Colors
 
@@ -28,7 +30,9 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 - **Contrast threshold** - Automatically invert colors when contrast is too low
 - **Preset themes** - Quick presets matching cyberspace.online site themes (Dark, Light, C64, VT320, Matrix, etc.)
 - **Site theme integration** - Optionally match your custom site theme's hue, saturation, or lightness
-- **Per-user overrides** - Right-click any username to set a custom color
+- **Style variations** - Optionally vary font-weight, italic, and small-caps based on username hash
+- **Prepend icons** - Optionally prepend a hash-based icon from a customizable set to each username
+- **Per-user overrides** - Right-click any username to set custom color, icon, and style variations
 
 ## Nick Style Override
 
