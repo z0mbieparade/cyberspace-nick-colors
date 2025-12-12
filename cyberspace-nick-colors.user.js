@@ -40,8 +40,12 @@
 	// CONFIGURATION
 	// =====================================================
 
-	// Debug mode - set to true to show detailed calculation info in color picker
-	const DEBUG = true;
+	// Debug mode - shows detailed calculation info in dialogs
+	let DEBUG = GM_getValue('debugMode', 'false') === 'true';
+
+	function saveDebugMode() {
+		GM_setValue('debugMode', DEBUG ? 'true' : 'false');
+	}
 
 	// URL to fetch manual overrides from (set to null to disable)
 	// Host your overrides.json on GitHub, Gist, or any CORS-friendly location
@@ -370,6 +374,323 @@
 
 	function saveCustomNickColors() {
 		GM_setValue('customNickColors', JSON.stringify(customNickColors));
+	}
+
+	// =====================================================
+	// EXPORT / IMPORT SETTINGS
+	// =====================================================
+
+	const EXPORT_VERSION = 1;
+
+	/**
+	 * Get only non-default values from an object by comparing to defaults
+	 */
+	function getNonDefaultValues(current, defaults) {
+		const result = {};
+		for (const key of Object.keys(current)) {
+			if (JSON.stringify(current[key]) !== JSON.stringify(defaults[key])) {
+				result[key] = current[key];
+			}
+		}
+		return Object.keys(result).length > 0 ? result : null;
+	}
+
+	/**
+	 * Export all settings to a JSON object (only non-default values)
+	 */
+	function exportSettings() {
+		const data = {
+			version: EXPORT_VERSION,
+			exportedAt: new Date().toISOString()
+		};
+
+		// Only include configs that have non-default values
+		const colorDiff = getNonDefaultValues(colorConfig, DEFAULT_COLOR_CONFIG);
+		if (colorDiff) data.colorConfig = colorDiff;
+
+		const siteThemeDiff = getNonDefaultValues(siteThemeConfig, DEFAULT_SITE_THEME_CONFIG);
+		if (siteThemeDiff) data.siteThemeConfig = siteThemeDiff;
+
+		const styleDiff = getNonDefaultValues(styleConfig, DEFAULT_STYLE_CONFIG);
+		if (styleDiff) data.styleConfig = styleDiff;
+
+		// Always include custom nick colors if any exist
+		if (Object.keys(customNickColors).length > 0) {
+			data.customNickColors = customNickColors;
+		}
+
+		return data;
+	}
+
+	/**
+	 * Import settings from a JSON object
+	 * @param {Object} data - The imported data
+	 * @returns {{ success: boolean, message: string }}
+	 */
+	function importSettings(data) {
+		try {
+			if (!data || typeof data !== 'object') {
+				return { success: false, message: 'Invalid data format' };
+			}
+
+			// Validate version (for future compatibility)
+			if (data.version && data.version > EXPORT_VERSION) {
+				return { success: false, message: `Export version ${data.version} is newer than supported version ${EXPORT_VERSION}` };
+			}
+
+			// Import color config
+			if (data.colorConfig) {
+				colorConfig = { ...DEFAULT_COLOR_CONFIG, ...data.colorConfig };
+				saveColorConfig();
+			}
+
+			// Import site theme config
+			if (data.siteThemeConfig) {
+				siteThemeConfig = { ...DEFAULT_SITE_THEME_CONFIG, ...data.siteThemeConfig };
+				saveSiteThemeConfig();
+			}
+
+			// Import style config
+			if (data.styleConfig) {
+				styleConfig = { ...DEFAULT_STYLE_CONFIG, ...data.styleConfig };
+				saveStyleConfig();
+			}
+
+			// Import custom nick colors
+			if (data.customNickColors) {
+				customNickColors = { ...data.customNickColors };
+				saveCustomNickColors();
+			}
+
+			refreshAllColors();
+			return { success: true, message: 'Settings imported successfully' };
+		} catch (e) {
+			return { success: false, message: `Import failed: ${e.message}` };
+		}
+	}
+
+	/**
+	 * Download data as a JSON file
+	 */
+	function downloadJson(data, filename) {
+		const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	/**
+	 * Download text as a file
+	 */
+	function downloadText(text, filename) {
+		const blob = new Blob([text], { type: 'text/plain' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	/**
+	 * Export debug logs for troubleshooting (returns plain text)
+	 */
+	function exportDebugLogs() {
+		const eff = getEffectiveColorConfig();
+		const lines = [];
+
+		lines.push('='.repeat(60));
+		lines.push('NICK COLORS DEBUG LOG');
+		lines.push('='.repeat(60));
+		lines.push('');
+		lines.push(`Exported: ${new Date().toISOString()}`);
+		lines.push(`URL: ${window.location.href}`);
+		lines.push(`User Agent: ${navigator.userAgent}`);
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push('SITE THEME');
+		lines.push('-'.repeat(60));
+		lines.push(`Site Theme: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
+		lines.push(`Site Theme HSL: ${siteThemeHsl ? JSON.stringify(siteThemeHsl) : 'none'}`);
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push('COLOR CONFIG');
+		lines.push('-'.repeat(60));
+		lines.push(JSON.stringify(colorConfig, null, 2));
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push('EFFECTIVE CONFIG (after site theme integration)');
+		lines.push('-'.repeat(60));
+		lines.push(JSON.stringify(eff, null, 2));
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push('SITE THEME CONFIG');
+		lines.push('-'.repeat(60));
+		lines.push(JSON.stringify(siteThemeConfig, null, 2));
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push('STYLE CONFIG');
+		lines.push('-'.repeat(60));
+		lines.push(JSON.stringify(styleConfig, null, 2));
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push(`CUSTOM NICK COLORS (${Object.keys(customNickColors).length} total)`);
+		lines.push('-'.repeat(60));
+		lines.push(JSON.stringify(customNickColors, null, 2));
+		lines.push('');
+
+		lines.push('-'.repeat(60));
+		lines.push(`MANUAL OVERRIDES (${Object.keys(MANUAL_OVERRIDES).length} total)`);
+		lines.push('-'.repeat(60));
+		lines.push(JSON.stringify(MANUAL_OVERRIDES, null, 2));
+		lines.push('');
+
+		// Collect all debug pre elements from the page
+		const debugPres = document.querySelectorAll('.nc-dialog-debug, .nc-dynamic-debug');
+		if (debugPres.length > 0) {
+			lines.push('-'.repeat(60));
+			lines.push(`DEBUG ELEMENTS (${debugPres.length} found)`);
+			lines.push('-'.repeat(60));
+			debugPres.forEach((pre, i) => {
+				lines.push(`[${i + 1}] ${pre.textContent.trim()}`);
+			});
+			lines.push('');
+		}
+
+		lines.push('='.repeat(60));
+		lines.push('END OF DEBUG LOG');
+		lines.push('='.repeat(60));
+
+		return lines.join('\n');
+	}
+
+	/**
+	 * Prompt user to select a JSON file and import it
+	 */
+	function promptImportFile() {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json,application/json';
+		input.onchange = (e) => {
+			const file = e.target.files[0];
+			if (!file) return;
+
+			const reader = new FileReader();
+			reader.onload = (event) => {
+				try {
+					const data = JSON.parse(event.target.result);
+					const result = importSettings(data);
+					alert(result.message);
+					if (result.success) {
+						// Close and reopen settings dialog to refresh UI
+						const settingsOverlay = document.querySelector('.nc-dialog-overlay');
+						if (settingsOverlay) {
+							settingsOverlay.remove();
+							createSettingsPanel();
+						}
+					}
+				} catch (err) {
+					alert(`Failed to parse file: ${err.message}`);
+				}
+			};
+			reader.readAsText(file);
+		};
+		input.click();
+	}
+
+	/**
+	 * Copy settings JSON to clipboard
+	 */
+	async function copySettingsToClipboard() {
+		const data = exportSettings();
+		try {
+			await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+			alert('Settings copied to clipboard');
+		} catch (err) {
+			alert(`Failed to copy: ${err.message}`);
+		}
+	}
+
+	/**
+	 * Show a paste dialog for importing settings
+	 */
+	function showPasteDialog() {
+		const overlay = document.createElement('div');
+		overlay.className = 'nc-dialog-overlay';
+		overlay.innerHTML = `
+			<div class="nc-dialog" style="min-width: 400px; max-width: 500px;">
+				<div class="nc-dialog-header nc-flex nc-justify-between">
+					<h3>Paste Settings</h3>
+					<div class="spacer"></div>
+					<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
+				</div>
+				<div class="nc-dialog-content">
+					<div class="hint" style="margin-bottom: 0.5rem;">Paste your settings JSON below (Ctrl+V or right-click → Paste)</div>
+					<textarea id="paste-settings-input" style="min-height: 150px; width: 100%; font-family: monospace; font-size: 0.75rem;" placeholder="Paste settings JSON here..."></textarea>
+				</div>
+				<div class="nc-dialog-footer">
+					<div class="buttons nc-flex nc-items-center nc-gap-2">
+						<button class="nc-import-paste-btn link-brackets"><span class="inner">IMPORT</span></button>
+						<button class="nc-cancel-btn link-brackets"><span class="inner">CANCEL</span></button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		const close = () => overlay.remove();
+		const textarea = overlay.querySelector('#paste-settings-input');
+
+		overlay.querySelector('.nc-header-close').addEventListener('click', close);
+		overlay.querySelector('.nc-cancel-btn').addEventListener('click', close);
+		overlay.querySelector('.nc-import-paste-btn').addEventListener('click', () => {
+			const text = textarea.value.trim();
+			if (!text) {
+				alert('Please paste settings JSON first');
+				return;
+			}
+			try {
+				const data = JSON.parse(text);
+				const result = importSettings(data);
+				alert(result.message);
+				if (result.success) {
+					close();
+					// Close and reopen settings dialog to refresh UI
+					const settingsOverlay = document.querySelector('.nc-dialog-overlay');
+					if (settingsOverlay) {
+						settingsOverlay.remove();
+						createSettingsPanel();
+					}
+				}
+			} catch (err) {
+				alert(`Failed to parse settings: ${err.message}`);
+			}
+		});
+
+		// Close on backdrop click
+		overlay.addEventListener('click', (e) => {
+			if (e.target === overlay) close();
+		});
+
+		// Close on Escape
+		overlay.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') close();
+		});
+
+		document.body.appendChild(overlay);
+		textarea.focus();
 	}
 
 	function hashString(str) {
@@ -1288,7 +1609,7 @@
 			justify-content: flex-end;
 		}
 		.nc-dialog button {
-			flex: 1; 
+			flex: 1 0 auto;
 			padding: 0.5rem;
 		}
 		.nc-dialog button:hover { border-color: var(--color-fg-dim, #666); }
@@ -1306,6 +1627,20 @@
 		.nc-dialog button.link-brackets .inner::after {
 			content: "]";
 		}
+		.nc-dialog button.nc-inline-btn {
+			flex: 0 0 auto;
+			padding: 0.25rem 0.75rem;
+			font-size: 0.75rem;
+			background: var(--color-bg, #0a0a0a);
+			border: 1px solid var(--color-border, #333);
+			color: var(--color-fg-dim, #888);
+			cursor: pointer;
+			transition: border-color 0.15s, color 0.15s;
+		}
+		.nc-dialog button.nc-inline-btn:hover {
+			border-color: var(--color-fg, #fff);
+			color: var(--color-fg, #fff);
+		}
 		.nc-dialog input[type="text"], .nc-dialog textarea, .nc-dialog select {
 			width: 100%; padding: 0.5rem; background: var(--color-bg, #0a0a0a);
 			border: 1px solid var(--color-border, #333); color: var(--color-fg, #fff);
@@ -1314,13 +1649,81 @@
 		.nc-dialog textarea { min-height: 70px; resize: vertical; }
 		.nc-dialog .nc-toggle { display: flex; margin: 0.5rem 0; }
 		.nc-dialog .hint { font-size: 0.625rem; color: var(--color-fg-dim, #666); margin-top: 0.25rem; }
+
+		/* Toggle component styles */
+		.nc-dialog .nc-toggle-label {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.75rem;
+			cursor: pointer;
+			flex-shrink: 0;
+		}
+		.nc-dialog .nc-toggle-value {
+			font-size: 0.75rem;
+			color: var(--color-fg-dim, #888);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+		.nc-dialog .nc-toggle-track {
+			position: relative;
+			width: 2.5rem;
+			height: 1.25rem;
+			border: 1px solid var(--color-border, #333);
+			border-radius: var(--radius-md);
+			transition: background-color 0.15s;
+		}
+		.nc-dialog .nc-toggle-track.active {
+			background: var(--color-fg, #fff);
+		}
+		.nc-dialog .nc-toggle-track:not(.active) {
+			background: var(--color-fg-dim, #666);
+		}
+		.nc-dialog .nc-toggle-thumb {
+			position: absolute;
+			top: 2px;
+			width: 1rem;
+			height: 0.875rem;
+			background: var(--color-bg, #0a0a0a);
+			border-radius: var(--radius-md);
+			transition: transform 0.15s;
+		}
+		.nc-dialog .nc-toggle-thumb.pos-start { transform: translateX(2px); }
+		.nc-dialog .nc-toggle-thumb.pos-middle { transform: translateX(10px); }
+		.nc-dialog .nc-toggle-thumb.pos-end { transform: translateX(20px); }
+		.nc-dialog .nc-sr-only {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+			border: 0;
+		}
+		.nc-dialog .nc-text-dim {
+			color: var(--color-fg-dim, #888);
+		}
+
 		.nc-dialog .nc-dialog-attribution {
 			width: 100%;
+			display: flex;
+			justify-content: flex-end;
+			gap: 0.5rem;
 			border-top: 1px dotted var(--color-border, #333);
 			margin-top: 0.3rem; font-size: 0.625rem; color: var(--color-fg-dim, #666);
 			padding-top: 0.3rem;
-			text-align: right;
 		}
+
+		/* Layout utility classes */
+		.nc-dialog .nc-flex { display: flex; }
+		.nc-dialog .nc-flex-wrap { flex-wrap: wrap; }
+		.nc-dialog .nc-flex-shrink-0 { flex-shrink: 0; }
+		.nc-dialog .nc-items-center { align-items: center; }
+		.nc-dialog .nc-justify-between { justify-content: space-between; }
+		.nc-dialog .nc-gap-2 { gap: 0.5rem; }
+		.nc-dialog .nc-gap-3 { gap: 0.75rem; }
+		.nc-dialog .nc-gap-4 { gap: 1rem; }
+		.nc-dialog .nc-cursor-pointer { cursor: pointer; }
 		.nc-dialog .nc-dialog-attribution a {
 			color: var(--color-fg-dim, #666); text-decoration: none;
 		}
@@ -1346,115 +1749,145 @@
 	// =====================================================
 
 	/**
-	 * Creates a stacked input row (label on top, input below)
-	 * @param {Object} opts - { label, id, type, value, placeholder, hint, classes }
+	 * Creates an input row with various input types
+	 * @param {Object} opts - Configuration object
+	 * @param {string} opts.label - Label text
+	 * @param {string} opts.id - Input element ID
+	 * @param {string} [opts.type='text'] - Input type: text, textarea, select, toggle, tristate, button
+	 * @param {string} [opts.value=''] - Input value (for text/textarea)
+	 * @param {string} [opts.placeholder=''] - Placeholder text
+	 * @param {string} [opts.hint=''] - Hint text below input
+	 * @param {string} [opts.classes=''] - Additional CSS classes
+	 * @param {string} [opts.options] - Options HTML for select type
+	 * @param {boolean} [opts.checked=false] - Checked state for toggle type
+	 * @param {boolean} [opts.disabled=false] - Disabled state for toggle type
+	 * @param {boolean|null} [opts.state=null] - State for tristate (null=auto, true, false)
+	 * @param {string} [opts.defaultLabel=''] - Default label shown for tristate
+	 * @param {string} [opts.buttonText=''] - Button text for button type
+	 * @param {boolean} [opts.stacked=false] - Force stacked layout (label on top)
 	 * @returns {string} HTML string
 	 */
 	function createInputRow(opts) {
-		const { label, id, type = 'text', value = '', placeholder = '', hint = '', classes = '' } = opts;
-		const classStr = `nc-input-row-stacked${classes ? ' ' + classes : ''}`;
+		const {
+			label, id, type = 'text', value = '', placeholder = '', hint = '', classes = '',
+			options, checked = false, disabled = false, state = null, defaultLabel = '', buttonText = '',
+			stacked = false
+		} = opts;
 
-		let inputHtml;
-		if (type === 'textarea') {
-			inputHtml = `<textarea id="${id}" placeholder="${placeholder}">${value}</textarea>`;
-		} else if (type === 'select' && opts.options) {
-			inputHtml = `<select id="${id}">${opts.options}</select>`;
-		} else {
-			inputHtml = `<input type="${type}" id="${id}" value="${value}" placeholder="${placeholder}">`;
+		// Stacked layout types: text, textarea, select (or forced with stacked=true)
+		const isStackedType = stacked || ['text', 'textarea', 'select'].includes(type);
+
+		if (isStackedType) {
+			const classStr = `nc-input-row-stacked${classes ? ' ' + classes : ''}`;
+			let inputHtml;
+			if (type === 'textarea') {
+				inputHtml = `<textarea id="${id}" placeholder="${placeholder}">${value}</textarea>`;
+			} else if (type === 'select' && options) {
+				inputHtml = `<select id="${id}">${options}</select>`;
+			} else {
+				inputHtml = `<input type="${type}" id="${id}" value="${value}" placeholder="${placeholder}">`;
+			}
+			return `
+				<div class="${classStr}">
+					${label ? `<label for="${id}">${label}</label>` : ''}
+					${inputHtml}
+					${hint ? `<div class="hint">${hint}</div>` : ''}
+				</div>
+			`;
 		}
 
-		return `
-			<div class="${classStr}">
-				<label for="${id}">${label}</label>
-				${inputHtml}
-				${hint ? `<div class="hint">${hint}</div>` : ''}
-			</div>
-		`;
+		// Inline layout types: toggle, tristate, button
+		if (type === 'toggle') {
+			const classStr = `nc-input-row nc-flex nc-items-center nc-justify-between nc-gap-4 nc-toggle${classes ? ' ' + classes : ''}`;
+			return `
+				<div class="${classStr}">
+					<label>${label}</label>
+					<label class="nc-toggle-label">
+						<div class="nc-toggle-value">${checked ? 'true' : 'false'}</div>
+						<input type="checkbox" id="${id}" class="nc-sr-only" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+						<div class="nc-toggle-track${checked ? ' active' : ''}">
+							<div class="nc-toggle-thumb ${checked ? 'pos-end' : 'pos-start'}"></div>
+						</div>
+					</label>
+				</div>
+			`;
+		}
+
+		if (type === 'tristate') {
+			const classStr = `nc-input-row nc-flex nc-items-center nc-justify-between nc-gap-4 nc-toggle nc-tristate-toggle${classes ? ' ' + classes : ''}`;
+			const stateText = state === true ? 'true' : state === false ? 'false' : 'auto';
+			const isChecked = state === true;
+			const thumbPosClass = state === true ? 'pos-end' : state === false ? 'pos-start' : 'pos-middle';
+			return `
+				<div class="${classStr}">
+					<label>${label}${defaultLabel ? ` <span class="nc-text-dim">(default: ${defaultLabel})</span>` : ''}</label>
+					<label class="nc-toggle-label">
+						<div class="nc-toggle-value">${stateText}</div>
+						<input type="checkbox" id="${id}" class="nc-sr-only" ${isChecked ? 'checked' : ''}>
+						<div class="nc-toggle-track${isChecked ? ' active' : ''}">
+							<div class="nc-toggle-thumb ${thumbPosClass}"></div>
+						</div>
+					</label>
+				</div>
+			`;
+		}
+
+		if (type === 'button') {
+			const classStr = `nc-input-row nc-flex nc-items-center nc-justify-between nc-gap-4${classes ? ' ' + classes : ''}`;
+			return `
+				<div class="${classStr}">
+					<label>${label}</label>
+					<button id="${id}" class="nc-inline-btn nc-flex-shrink-0">${buttonText}</button>
+				</div>
+			`;
+		}
+
+		// Fallback for unknown types
+		return '';
 	}
 
-	/**
-	 * Creates a toggle row (label and toggle side by side)
-	 * @param {Object} opts - { label, id, checked, disabled, classes }
-	 * @returns {string} HTML string
-	 */
+	// Legacy helper functions that delegate to createInputRow
 	function createToggleRow(opts) {
-		const { label, id, checked = false, disabled = false, classes = '' } = opts;
-		const classStr = `nc-input-row flex items-center justify-between gap-4 nc-toggle${classes ? ' ' + classes : ''}`;
+		return createInputRow({ ...opts, type: 'toggle' });
+	}
 
-		return `
-			<div class="${classStr}">
-				<label class="text-fg text-sm">${label}</label>
-				<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-					<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${checked ? 'true' : 'false'}</div>
-					<input type="checkbox" id="${id}" class="sr-only" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
-					<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${checked ? 'bg-fg' : 'bg-fg-dim'}">
-						<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg transition-transform rounded-md ${checked ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-					</div>
-				</label>
-			</div>
-		`;
+	function createTriStateToggleRow(opts) {
+		return createInputRow({ ...opts, type: 'tristate' });
 	}
 
 	/**
-	 * Creates a debug pre element (only shown when DEBUG is true)
+	 * Creates a debug pre element (hidden when DEBUG is false, but still in DOM for export)
 	 * @param {Object|string} data - Object with label/value pairs, or plain string for unlabeled content
 	 * @param {string} [classes] - Additional CSS classes
-	 * @returns {string} HTML string (empty if DEBUG is false)
+	 * @returns {string} HTML string
 	 */
 	function createDebugPre(data, classes = '') {
-		if (!DEBUG) return '';
+		const hiddenStyle = DEBUG ? '' : ' style="display: none;"';
 		const classStr = `nc-dialog-debug${classes ? ' ' + classes : ''}`;
 		if (typeof data === 'string') {
-			return `<pre class="${classStr}">${data}</pre>`;
+			return `<pre class="${classStr}"${hiddenStyle}>${data}</pre>`;
 		}
 		const lines = Object.entries(data)
 			.map(([label, value]) => `<strong>${label}:</strong> ${value ?? 'N/A'}`)
 			.join('\n');
-		return `<pre class="${classStr}">\n${lines}\n</pre>`;
+		return `<pre class="${classStr}"${hiddenStyle}>\n${lines}\n</pre>`;
 	}
 
 	/**
 	 * Gets or creates a debug pre element under a parent (for dynamic updates)
 	 * @param {HTMLElement} parent - Parent element to append to
 	 * @param {string} [classes] - Additional CSS classes
-	 * @returns {HTMLElement|null} The debug element, or null if DEBUG is false
+	 * @returns {HTMLElement} The debug element (hidden if DEBUG is false)
 	 */
 	function getOrCreateDebugPre(parent, classes = '') {
-		if (!DEBUG) return null;
 		let debug = parent.querySelector('.nc-dynamic-debug');
 		if (!debug) {
 			debug = document.createElement('pre');
 			debug.className = `nc-dynamic-debug nc-dialog-debug${classes ? ' ' + classes : ''}`;
 			parent.appendChild(debug);
 		}
+		debug.style.display = DEBUG ? '' : 'none';
 		return debug;
-	}
-
-	/**
-	 * Creates a tri-state toggle row (auto/true/false)
-	 * @param {Object} opts - { label, id, state (null=auto, true, false), defaultLabel, classes }
-	 * @returns {string} HTML string
-	 */
-	function createTriStateToggleRow(opts) {
-		const { label, id, state = null, defaultLabel = '', classes = '' } = opts;
-		const classStr = `nc-input-row flex items-center justify-between gap-4 nc-toggle nc-tristate-toggle${classes ? ' ' + classes : ''}`;
-
-		const stateText = state === true ? 'true' : state === false ? 'false' : 'auto';
-		const isChecked = state === true;
-		const thumbPosition = state === true ? '1.25rem' : state === false ? '0.125rem' : '0.625rem';
-
-		return `
-			<div class="${classStr}">
-				<label class="text-fg text-sm">${label}${defaultLabel ? ` <span class="text-fg-dim">(default: ${defaultLabel})</span>` : ''}</label>
-				<label class="inline-flex items-center gap-3 cursor-pointer group flex-shrink-0">
-					<div class="nc-toggle-value text-xs text-fg-dim uppercase tracking-wider">${stateText}</div>
-					<input type="checkbox" id="${id}" class="sr-only" ${isChecked ? 'checked' : ''}>
-					<div class="nc-toggle-track relative w-10 h-5 border transition-colors rounded-md border-border ${isChecked ? 'bg-fg' : 'bg-fg-dim'}">
-						<div class="nc-toggle-thumb absolute top-0.5 w-4 h-3.5 bg-bg rounded-md" style="transition: transform 0.15s; transform: translateX(${thumbPosition})"></div>
-					</div>
-				</label>
-			</div>
-		`;
 	}
 
 	/**
@@ -1469,8 +1902,8 @@
 		overlay.className = 'nc-dialog-overlay';
 		overlay.innerHTML = `
 			<div class="nc-dialog" style="min-width: ${width}; max-width: calc(${width} + 100px);">
-				<div class="nc-dialog-header flex justify-between">
-					<h3 class="tracking-wider">${title}</h3>
+				<div class="nc-dialog-header nc-flex nc-justify-between">
+					<h3>${title}</h3>
 					<div class="spacer"></div>
 					${onSettings ? '<button class="nc-header-settings link-brackets"><span class="inner">SETTINGS</span></button>' : ''}
 					<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
@@ -1480,10 +1913,10 @@
 					${content}
 				</div>
 				<div class="nc-dialog-footer">
-					<div class="buttons flex flex-wrap items-center gap-2">
+					<div class="buttons nc-flex nc-flex-wrap nc-items-center nc-gap-2">
 						${buttons.map(b => `<button class="${b.class || ''} link-brackets"><span class="inner">${b.label}</span></button>`).join('')}
 					</div>
-					<div class="nc-dialog-attribution hint flex justify-end gap-2">
+					<div class="nc-dialog-attribution hint">
 						<span>created by <a href="/z0ylent">@z0ylent</a></span>
 						<span> | </span>
 						<span><a href="https://z0m.bi" target="_blank">https://z0m.bi</a></span>
@@ -1641,7 +2074,7 @@
 					classes: 'no-padding-top'
 				})}
 				<div class="nc-input-row-stacked no-padding-top" id="picker-icon-container" style="display: ${initialIconState === true ? 'block' : 'none'}">
-					${styleConfig.iconSet ? `<div id="picker-icon-options" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: 3px; transition: background 0.15s, border-color 0.15s;" title="Click to copy">${icon}</span>`).join('')}</div>` : ''}
+					${styleConfig.iconSet ? `<div id="picker-icon-options" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to copy">${icon}</span>`).join('')}</div>` : ''}
 					<input type="text" id="picker-icon" value="${currentIcon}" placeholder="click above or enter your own">
 					<div class="hint">Single character/emoji prepended to this user's name</div>
 				</div>
@@ -1864,26 +2297,22 @@
 			if (satValuesEl) satValuesEl.textContent = `[${Math.round(s)} → ${Math.round(mappedS)}]`;
 			if (litValuesEl) litValuesEl.textContent = `[${Math.round(l)} → ${Math.round(mappedL)}]`;
 
-			// Debug info under each slider
+			// Debug info under each slider (hidden if DEBUG is false)
 			const hueDebug = getOrCreateDebugPre(hueSlider.el);
 			const satDebug = getOrCreateDebugPre(satSlider.el);
 			const litDebug = getOrCreateDebugPre(litSlider.el);
 
-			if (hueDebug) {
-				const hueRange = eff.maxHue - eff.minHue;
-				const hueT = h / 360;
-				hueDebug.textContent = `t=${hueT.toFixed(3)} | ${eff.minHue} + ${hueT.toFixed(3)} * (${eff.maxHue} - ${eff.minHue}) = ${eff.minHue} + ${hueT.toFixed(3)} * ${hueRange} = ${(eff.minHue + hueT * hueRange).toFixed(1)}`;
-			}
-			if (satDebug) {
-				const satRange = eff.maxSaturation - eff.minSaturation;
-				const satT = s / 100;
-				satDebug.textContent = `t=${satT.toFixed(3)} | ${eff.minSaturation} + ${satT.toFixed(3)} * (${eff.maxSaturation} - ${eff.minSaturation}) = ${(eff.minSaturation + satT * satRange).toFixed(1)}`;
-			}
-			if (litDebug) {
-				const litRange = eff.maxLightness - eff.minLightness;
-				const litT = l / 100;
-				litDebug.textContent = `t=${litT.toFixed(3)} | ${eff.minLightness} + ${litT.toFixed(3)} * (${eff.maxLightness} - ${eff.minLightness}) = ${(eff.minLightness + litT * litRange).toFixed(1)}`;
-			}
+			const hueRange = eff.maxHue - eff.minHue;
+			const hueT = h / 360;
+			hueDebug.textContent = `t=${hueT.toFixed(3)} | ${eff.minHue} + ${hueT.toFixed(3)} * (${eff.maxHue} - ${eff.minHue}) = ${eff.minHue} + ${hueT.toFixed(3)} * ${hueRange} = ${(eff.minHue + hueT * hueRange).toFixed(1)}`;
+
+			const satRange = eff.maxSaturation - eff.minSaturation;
+			const satT = s / 100;
+			satDebug.textContent = `t=${satT.toFixed(3)} | ${eff.minSaturation} + ${satT.toFixed(3)} * (${eff.maxSaturation} - ${eff.minSaturation}) = ${(eff.minSaturation + satT * satRange).toFixed(1)}`;
+
+			const litRange = eff.maxLightness - eff.minLightness;
+			const litT = l / 100;
+			litDebug.textContent = `t=${litT.toFixed(3)} | ${eff.minLightness} + ${litT.toFixed(3)} * (${eff.maxLightness} - ${eff.minLightness}) = ${(eff.minLightness + litT * litRange).toFixed(1)}`;
 		}
 
 		function updatePreview() {
@@ -2008,14 +2437,13 @@
 
 			// Update track color
 			if (track) {
-				track.classList.remove('bg-fg', 'bg-fg-dim');
-				track.classList.add(state === true ? 'bg-fg' : 'bg-fg-dim');
+				track.classList.toggle('active', state === true);
 			}
 
-			// Update thumb position: left (false/0.125rem), middle (auto/0.625rem), right (true/1.25rem)
+			// Update thumb position
 			if (thumb) {
-				const pos = state === true ? '1.25rem' : state === false ? '0.125rem' : '0.625rem';
-				thumb.style.transform = `translateX(${pos})`;
+				thumb.classList.remove('pos-start', 'pos-middle', 'pos-end');
+				thumb.classList.add(state === true ? 'pos-end' : state === false ? 'pos-start' : 'pos-middle');
 			}
 		}
 
@@ -2104,7 +2532,7 @@
 					options: `<option value="">-- Select a preset --</option>${Object.keys(PRESET_THEMES).map(name => `<option value="${name}">${name}</option>`).join('')}`
 				})}
 				<hr />
-				<h4>Hue Range${siteThemeHsl ? '' : ' <span class="text-fg-dim">(no site theme)</span>'}</h4>
+				<h4>Hue Range${siteThemeHsl ? '' : ' <span class="nc-text-dim">(no site theme)</span>'}</h4>
 				${createToggleRow({
 					label: `Use site theme foreground hue${siteThemeHsl ? ` <span style="color:hsl(${siteThemeHsl.h}, 100%, 50%)">(${siteThemeHsl.h}°)</span>` : ''}`,
 					id: 'settings-site-hue',
@@ -2147,9 +2575,21 @@
 				${createToggleRow({ label: 'Vary small-caps', id: 'settings-vary-case', checked: styleConfig.varyCase })}
 				${createToggleRow({ label: 'Prepend icon', id: 'settings-prepend-icon', checked: styleConfig.prependIcon })}
 				<div class="nc-input-row-stacked" id="icon-set-container" style="display: ${styleConfig.prependIcon ? 'block' : 'none'}">
-					<label class="text-fg text-sm">Icon set (space-separated)</label>
+					<label for="settings-icon-set">Icon set (space-separated)</label>
 					<input type="text" id="settings-icon-set" value="${styleConfig.iconSet}" placeholder="● ○ ◆ ◇ ■ □ ▲ △ ★ ☆">
 				</div>
+				<hr />
+				<h4>Backup</h4>
+				${createInputRow({ type: 'button', label: 'Export settings to file', id: 'settings-export-file', buttonText: 'Save Settings File' })}
+				${createInputRow({ type: 'button', label: 'Export settings to clipboard', id: 'settings-export-copy', buttonText: 'Copy to Clipboard' })}
+				${createInputRow({ type: 'button', label: 'Import settings from file', id: 'settings-import-file', buttonText: 'Load Settings File' })}
+				${createInputRow({ type: 'button', label: 'Import settings from clipboard', id: 'settings-import-paste', buttonText: 'Paste from Clipboard' })}
+				<hr />
+				<h4>Debug</h4>
+				${createInputRow({ type: 'toggle', label: 'Enable debug mode', id: 'settings-debug-mode', checked: DEBUG })}
+				${createInputRow({ type: 'button', label: 'Export debug log to file', id: 'settings-debug-export-file', buttonText: 'Save Debug File' })}
+				${createInputRow({ type: 'button', label: 'Export debug log to clipboard', id: 'settings-debug-export-copy', buttonText: 'Copy to Clipboard' })}
+				${createInputRow({ type: 'button', label: 'Report an issue', id: 'settings-report-issue', buttonText: 'Report Issue' })}
 			`,
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
@@ -2361,12 +2801,11 @@
 			const thumb = label.querySelector('.nc-toggle-thumb');
 			if (valueEl) valueEl.textContent = isChecked ? 'true' : 'false';
 			if (track) {
-				track.classList.toggle('bg-fg', isChecked);
-				track.classList.toggle('bg-fg-dim', !isChecked);
+				track.classList.toggle('active', isChecked);
 			}
 			if (thumb) {
-				thumb.classList.toggle('translate-x-5', isChecked);
-				thumb.classList.toggle('translate-x-0.5', !isChecked);
+				thumb.classList.toggle('pos-end', isChecked);
+				thumb.classList.toggle('pos-start', !isChecked);
 			}
 		}
 
@@ -2485,6 +2924,106 @@
 		if (siteHueInput?.checked) updateSliderState(hueSliderContainer, true);
 		if (siteSaturationInput?.checked) updateSliderState(satSliderContainer, true);
 		if (siteLightnessInput?.checked) updateSliderState(litSliderContainer, true);
+
+		// Export/Import buttons
+		const exportFileBtn = dialog.querySelector('#settings-export-file');
+		const exportCopyBtn = dialog.querySelector('#settings-export-copy');
+		const importFileBtn = dialog.querySelector('#settings-import-file');
+		const importPasteBtn = dialog.querySelector('#settings-import-paste');
+		const debugModeInput = dialog.querySelector('#settings-debug-mode');
+		const debugExportFileBtn = dialog.querySelector('#settings-debug-export-file');
+		const debugExportCopyBtn = dialog.querySelector('#settings-debug-export-copy');
+		const reportIssueBtn = dialog.querySelector('#settings-report-issue');
+
+		if (exportFileBtn) {
+			exportFileBtn.addEventListener('click', () => {
+				const data = exportSettings();
+				const timestamp = new Date().toISOString().slice(0, 10);
+				downloadJson(data, `nick-colors-settings-${timestamp}.json`);
+			});
+		}
+
+		if (exportCopyBtn) {
+			exportCopyBtn.addEventListener('click', () => {
+				copySettingsToClipboard();
+			});
+		}
+
+		if (importFileBtn) {
+			importFileBtn.addEventListener('click', () => {
+				promptImportFile();
+			});
+		}
+
+		if (importPasteBtn) {
+			importPasteBtn.addEventListener('click', () => {
+				showPasteDialog();
+			});
+		}
+
+		if (debugModeInput) {
+			debugModeInput.addEventListener('change', () => {
+				updateToggle(debugModeInput);
+				DEBUG = debugModeInput.checked;
+				saveDebugMode();
+			});
+		}
+
+		if (debugExportFileBtn) {
+			debugExportFileBtn.addEventListener('click', () => {
+				const text = exportDebugLogs();
+				const timestamp = new Date().toISOString().slice(0, 10);
+				downloadText(text, `nick-colors-debug-${timestamp}.txt`);
+			});
+		}
+
+		if (debugExportCopyBtn) {
+			debugExportCopyBtn.addEventListener('click', async () => {
+				const text = exportDebugLogs();
+				try {
+					await navigator.clipboard.writeText(text);
+					alert('Debug log copied to clipboard');
+				} catch (err) {
+					alert(`Failed to copy: ${err.message}`);
+				}
+			});
+		}
+
+		if (reportIssueBtn) {
+			reportIssueBtn.addEventListener('click', () => {
+				const debugLog = exportDebugLogs();
+				const subject = encodeURIComponent('Nick Colors Issue Report');
+				const body = encodeURIComponent(`
+== ISSUE REPORT ==
+
+**What is your username on cyberspace.online?**
+
+
+**What issue are you experiencing?**
+(Describe the problem you're seeing)
+
+
+**What page did you see this on?**
+${window.location.href}
+
+**Steps to reproduce:**
+(What were you doing when the issue occurred?)
+1.
+2.
+3.
+
+**Any error messages?**
+(Paste any errors from the browser console, or attach screenshots)
+
+
+
+== DEBUG LOG ==
+
+${debugLog}
+`.trim());
+				window.open(`mailto:hey@z0m.bi?subject=${subject}&body=${body}`, '_blank');
+			});
+		}
 
 		// Initialize sliders to show site theme values if toggles are already on
 		updateSlidersForSiteTheme();
