@@ -87,6 +87,7 @@
 		varyItalic: false,    // randomly apply italic
 		varyCase: false,      // randomly apply small-caps
 		prependIcon: false,   // prepend random icon from iconSet
+		appendIcon: false,    // append random icon from iconSet
 		iconSet: '● ○ ◆ ◇ ■ □ ▲ △ ★ ☆ ♦ ♠ ♣ ♥ ☢ ☣ ☠ ⚙ ⬡ ⬢ ♻ ⚛ ⚠ ⛒',  // space-separated icons
 	};
 
@@ -873,9 +874,10 @@
 
 	/**
 	 * Get hash-based icon for a username (ignores overrides, for display defaults)
+	 * Returns the same icon for both prepend and append by default
 	 */
 	function getHashBasedIcon(username, config = styleConfig) {
-		if (!config.prependIcon || !config.iconSet) return null;
+		if ((!config.prependIcon && !config.appendIcon) || !config.iconSet) return null;
 		const icons = config.iconSet.split(/\s+/).filter(Boolean);
 		if (icons.length === 0) return null;
 		const hash = hashString(username + '_icon');
@@ -895,21 +897,39 @@
 	}
 
 	/**
-	 * Get a consistent icon for a username based on hash or custom override
-	 * Returns: string (icon) or null (no icon)
+	 * Get icons for a username
+	 * @returns {{ prepend: string|null, append: string|null }}
 	 */
-	function getIconForUsername(username) {
-		// Check for user-specific custom icon first (including explicitly disabled with '')
-		if (customNickColors[username] && 'icon' in customNickColors[username]) {
-			const icon = customNickColors[username].icon;
-			// Empty string means explicitly disabled - return null to show no icon
-			return icon || null;
+	function getIconsForUsername(username) {
+		const saved = customNickColors[username] || {};
+		const override = MANUAL_OVERRIDES[username] || {};
+
+		// Check if user has custom icon settings
+		const hasCustomIcons = 'prependIcon' in saved || 'appendIcon' in saved;
+		const hasOverrideIcons = 'prependIcon' in override || 'appendIcon' in override;
+
+		if (hasCustomIcons) {
+			// User has explicit icon settings - use them (empty string means disabled)
+			return {
+				prepend: saved.prependIcon || null,
+				append: saved.appendIcon || null
+			};
 		}
-		if (MANUAL_OVERRIDES[username]?.icon) {
-			return MANUAL_OVERRIDES[username].icon;
+
+		if (hasOverrideIcons) {
+			// Remote override has icon settings
+			return {
+				prepend: override.prependIcon || null,
+				append: override.appendIcon || null
+			};
 		}
-		// Fall back to hash-based icon if enabled
-		return getHashBasedIcon(username);
+
+		// Fall back to hash-based icon if enabled globally
+		const hashIcon = getHashBasedIcon(username);
+		return {
+			prepend: (styleConfig.prependIcon && hashIcon) ? hashIcon : null,
+			append: (styleConfig.appendIcon && hashIcon) ? hashIcon : null
+		};
 	}
 
 	function applyStyles(element, username) {
@@ -939,21 +959,21 @@
 		element.dataset.nickColored = 'true';
 		element.dataset.username = username;
 
-		// Prepend icon if enabled
-		const icon = getIconForUsername(username);
-		if (icon) {
+		// Prepend/append icon if enabled
+		const icons = getIconsForUsername(username);
+		if (icons.prepend || icons.append) {
 			if (!element.dataset.iconApplied) {
 				// Store original text before first icon application
 				element.dataset.originalText = element.textContent;
 				element.dataset.iconApplied = 'true';
-				element.textContent = icon + ' ' + element.textContent;
-			} else {
-				// Icon already applied - update it in case it changed
-				const originalText = element.dataset.originalText || element.textContent;
-				element.textContent = icon + ' ' + originalText;
 			}
+			const originalText = element.dataset.originalText || element.textContent;
+			let newText = originalText;
+			if (icons.prepend) newText = icons.prepend + ' ' + newText;
+			if (icons.append) newText = newText + ' ' + icons.append;
+			element.textContent = newText;
 		} else if (element.dataset.iconApplied) {
-			// Icon was removed - restore original text
+			// Icons were removed - restore original text
 			if (element.dataset.originalText) {
 				element.textContent = element.dataset.originalText;
 			}
@@ -1166,12 +1186,15 @@
 
 				// Create colored span for the mention
 				const span = document.createElement('span');
-				// Prepend icon if enabled
-				const icon = getIconForUsername(m.username);
-				span.textContent = icon ? icon + ' ' + m.full : m.full;
+				// Prepend/append icon if enabled
+				const icons = getIconsForUsername(m.username);
+				let displayText = m.full;
+				if (icons.prepend) displayText = icons.prepend + ' ' + displayText;
+				if (icons.append) displayText = displayText + ' ' + icons.append;
+				span.textContent = displayText;
 				span.dataset.mentionColored = 'true';
 				span.dataset.username = m.username;
-				if (icon) span.dataset.iconApplied = 'true';
+				if (icons.prepend || icons.append) span.dataset.iconApplied = 'true';
 
 				// Apply styles
 				const styles = generateStyles(m.username);
@@ -1226,17 +1249,8 @@
 			box-sizing: border-box;
 		}
 		/* Mapped track hidden by default */
-		.nc-slider-track-mapped {
+		.nc-slider .nc-slider-track-mapped {
 			display: none;
-		}
-		/* Split track for showing mapped vs full range - taller with gap */
-		.nc-slider.nc-slider-split { height: 34px; }
-		.nc-slider.nc-slider-split .nc-slider-track {
-			top: calc(50% + 1px);
-			bottom: 4px;
-		}
-		.nc-slider.nc-slider-split .nc-slider-track-mapped {
-			display: block;
 			position: absolute;
 			top: 4px;
 			bottom: calc(50% + 1px);
@@ -1245,6 +1259,15 @@
 			border: 1px solid var(--color-border, #333);
 			background: var(--color-code-bg, #444);
 			box-sizing: border-box;
+		}
+		/* Split track for showing mapped vs full range - taller with gap */
+		.nc-slider.nc-slider-split { height: 34px; }
+		.nc-slider.nc-slider-split .nc-slider-track {
+			top: calc(50% + 1px);
+			bottom: 4px;
+		}
+		.nc-slider.nc-slider-split .nc-slider-track-mapped {
+			display: block !important;
 		}
 		.nc-slider-thumb {
 			position: absolute; top: 0; width: 14px; height: 22px;
@@ -1980,12 +2003,15 @@
 		);
 		const currentCssString = stylesToCssString(filteredStyles, ';\n');
 
-		// Get current custom icon state: undefined = auto, '' = disabled, string = custom
-		const savedIcon = customNickColors[username]?.icon;
-		const currentIcon = savedIcon || '';
-		// Determine icon state: null = auto (use global), false = disabled, true = custom
-		const hasIconProperty = customNickColors[username] && 'icon' in customNickColors[username];
-		const initialIconState = !hasIconProperty ? null : (savedIcon ? true : false);
+		// Get current custom icon state
+		const savedData = customNickColors[username] || {};
+		const savedPrependIcon = savedData.prependIcon ?? '';
+		const savedAppendIcon = savedData.appendIcon ?? '';
+		// Determine icon states: null = auto (use global), false = disabled, true = custom
+		const hasPrependIconProperty = 'prependIcon' in savedData;
+		const hasAppendIconProperty = 'appendIcon' in savedData;
+		const initialPrependIconState = !hasPrependIconProperty ? null : (savedPrependIcon ? true : false);
+		const initialAppendIconState = !hasAppendIconProperty ? null : (savedAppendIcon ? true : false);
 
 		// Calculate hash-based defaults for display
 		const hashIcon = getHashBasedIcon(username) || '';
@@ -2065,22 +2091,33 @@
 				})}
 				${isRestricted ? `<div class="hint" style="margin-top: 0.5rem;">Color range is restricted. Preview shows mapped result. Click SETTINGS to adjust.</div>` : ''}
 				<hr />
-				<h4>Custom Icon</h4>
+				<h4>Custom Icons</h4>
+				<div class="hint">Prepend/Append a custom character or emoji to the nickname.</div>
 				${createTriStateToggleRow({
-					label: 'Custom icon',
-					id: 'picker-icon-enabled',
-					state: initialIconState,
+					label: 'Prepend icon',
+					id: 'picker-prepend-icon-enabled',
+					state: initialPrependIconState,
 					defaultLabel: hashIcon,
 					classes: 'no-padding-top'
 				})}
-				<div class="nc-input-row-stacked no-padding-top" id="picker-icon-container" style="display: ${initialIconState === true ? 'block' : 'none'}">
-					${styleConfig.iconSet ? `<div id="picker-icon-options" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to copy">${icon}</span>`).join('')}</div>` : ''}
-					<input type="text" id="picker-icon" value="${currentIcon}" placeholder="click above or enter your own">
-					<div class="hint">Single character/emoji prepended to this user's name</div>
+				<div class="nc-input-row-stacked no-padding-top" id="picker-prepend-icon-container" style="display: ${initialPrependIconState === true ? 'block' : 'none'}">
+					${styleConfig.iconSet ? `<div class="picker-icon-options" data-target="picker-prepend-icon" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>` : ''}
+					${createInputRow({ id: 'picker-prepend-icon', value: savedPrependIcon, placeholder: 'custom icon before nickname', classes: 'no-padding-top' })}
+				</div>
+				${createTriStateToggleRow({
+					label: 'Append icon',
+					id: 'picker-append-icon-enabled',
+					state: initialAppendIconState,
+					defaultLabel: hashIcon,
+					classes: 'no-padding-top'
+				})}
+				<div class="nc-input-row-stacked no-padding-top" id="picker-append-icon-container" style="display: ${initialAppendIconState === true ? 'block' : 'none'}">
+					${styleConfig.iconSet ? `<div class="picker-icon-options" data-target="picker-append-icon" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>` : ''}
+					${createInputRow({ id: 'picker-append-icon', value: savedAppendIcon, placeholder: 'custom icon after nickname', classes: 'no-padding-top' })}
 				</div>
 				<hr />
 				<h4>Style Variations</h4>
-				<div class="hint" style="margin-bottom: 0.5rem;">Override the global style settings for this user</div>
+				<div class="hint">Override the global style settings for this user to add some visual flair.</div>
 				${createTriStateToggleRow({
 					label: 'Bold',
 					id: 'picker-weight',
@@ -2124,18 +2161,18 @@
 			buttons: [
 				{ label: 'Save', class: 'save', onClick: (close) => {
 					const styles = { color: getTextColor(), ...parseCssText(cssInput.value) };
-					// Add custom icon based on tri-state: null = auto (don't save), true = custom, false = disabled
-					if (iconState === true) {
-						const iconValue = iconInput.value.trim();
-						if (iconValue) {
-							styles.icon = iconValue;
-						} else {
-							styles.icon = ''; // Explicitly set but empty - will be treated as disabled
-						}
-					} else if (iconState === false) {
-						styles.icon = ''; // Explicitly disabled
+					// Add prepend icon based on tri-state: null = auto (don't save), true = custom, false = disabled
+					if (prependIconState === true) {
+						styles.prependIcon = prependIconInput.value.trim();
+					} else if (prependIconState === false) {
+						styles.prependIcon = ''; // Explicitly disabled
 					}
-					// iconState === null means auto, so we don't save the icon property
+					// Add append icon based on tri-state
+					if (appendIconState === true) {
+						styles.appendIcon = appendIconInput.value.trim();
+					} else if (appendIconState === false) {
+						styles.appendIcon = ''; // Explicitly disabled
+					}
 					// Add style variations if explicitly set (not auto)
 					if (weightState !== null) {
 						styles.fontWeight = weightState ? 'bold' : 'normal';
@@ -2167,9 +2204,12 @@
 		const preview = dialog.querySelector('#picker-preview');
 		const previewMention = dialog.querySelector('#picker-preview-mention');
 		const customInput = dialog.querySelector('#picker-custom');
-		const iconEnabledInput = dialog.querySelector('#picker-icon-enabled');
-		const iconContainer = dialog.querySelector('#picker-icon-container');
-		const iconInput = dialog.querySelector('#picker-icon');
+		const prependIconEnabledInput = dialog.querySelector('#picker-prepend-icon-enabled');
+		const prependIconContainer = dialog.querySelector('#picker-prepend-icon-container');
+		const prependIconInput = dialog.querySelector('#picker-prepend-icon');
+		const appendIconEnabledInput = dialog.querySelector('#picker-append-icon-enabled');
+		const appendIconContainer = dialog.querySelector('#picker-append-icon-container');
+		const appendIconInput = dialog.querySelector('#picker-append-icon');
 		const weightInput = dialog.querySelector('#picker-weight');
 		const italicInput = dialog.querySelector('#picker-italic');
 		const caseInput = dialog.querySelector('#picker-case');
@@ -2178,7 +2218,8 @@
 		const slidersContainer = dialog.querySelector('#picker-sliders');
 
 		// Track tri-state for toggles (null = auto/inherit, true = on, false = off)
-		let iconState = initialIconState;
+		let prependIconState = initialPrependIconState;
+		let appendIconState = initialAppendIconState;
 		let weightState = currentWeight === 'bold' ? true : currentWeight === 'normal' ? false : null;
 		let italicState = currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null;
 		let caseState = currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null;
@@ -2347,15 +2388,21 @@
 			}
 			// invertState === false means explicitly disabled
 
-			// Show icon in preview based on tri-state: true = custom, false = disabled, null = auto (global)
-			let iconValue = '';
-			if (iconState === true) {
-				iconValue = iconInput.value.trim();
-			} else if (iconState === null) {
-				// Auto - use global hash-based icon if enabled
-				iconValue = hashIcon;
+			// Show icons in preview based on tri-state: true = custom, false = disabled, null = auto (global)
+			let prependValue = '';
+			let appendValue = '';
+			// Prepend icon state
+			if (prependIconState === true) {
+				prependValue = prependIconInput.value.trim();
+			} else if (prependIconState === null && styleConfig.prependIcon) {
+				prependValue = hashIcon;
 			}
-			// iconState === false means explicitly disabled, so iconValue stays empty
+			// Append icon state
+			if (appendIconState === true) {
+				appendValue = appendIconInput.value.trim();
+			} else if (appendIconState === null && styleConfig.appendIcon) {
+				appendValue = hashIcon;
+			}
 
 			// Helper to apply styles to a preview element
 			const applyPreviewStyles = (el, isMention) => {
@@ -2371,7 +2418,10 @@
 				el.style.fontStyle = effectiveItalic;
 				el.style.fontVariant = effectiveCase;
 				const prefix = isMention ? '@' : '';
-				el.textContent = iconValue ? iconValue + ' ' + prefix + username : prefix + username;
+				let displayText = prefix + username;
+				if (prependValue) displayText = prependValue + ' ' + displayText;
+				if (appendValue) displayText = displayText + ' ' + appendValue;
+				el.textContent = displayText;
 			};
 
 			// Update both previews (false = not mention, true = mention)
@@ -2390,34 +2440,52 @@
 		}
 
 		customInput.addEventListener('input', updatePreview);
-		iconInput.addEventListener('input', updatePreview);
+		prependIconInput.addEventListener('input', updatePreview);
+		appendIconInput.addEventListener('input', updatePreview);
 		cssInput.addEventListener('input', updatePreview);
 
-		// Icon toggle handler (tri-state like style variations)
-		iconEnabledInput.closest('label').addEventListener('click', (e) => {
-			e.preventDefault();
-			iconState = cycleTriState(iconState);
-			updateTriStateToggle(iconEnabledInput, iconState);
-			// Show/hide icon input (only show when state is true/custom)
-			iconContainer.style.display = iconState === true ? 'block' : 'none';
-			updatePreview();
-		});
+		// Prepend icon toggle handler (tri-state like style variations)
+		if (prependIconEnabledInput) {
+			prependIconEnabledInput.closest('label').addEventListener('click', (e) => {
+				e.preventDefault();
+				prependIconState = cycleTriState(prependIconState);
+				updateTriStateToggle(prependIconEnabledInput, prependIconState);
+				// Show/hide icon input (only show when state is true/custom)
+				prependIconContainer.style.display = prependIconState === true ? 'block' : 'none';
+				updatePreview();
+			});
+		}
 
-		// Icon option click handlers - click to select
-		const iconOptions = dialog.querySelector('#picker-icon-options');
-		if (iconOptions) {
+		// Append icon toggle handler (tri-state like style variations)
+		if (appendIconEnabledInput) {
+			appendIconEnabledInput.closest('label').addEventListener('click', (e) => {
+				e.preventDefault();
+				appendIconState = cycleTriState(appendIconState);
+				updateTriStateToggle(appendIconEnabledInput, appendIconState);
+				// Show/hide icon input (only show when state is true/custom)
+				appendIconContainer.style.display = appendIconState === true ? 'block' : 'none';
+				updatePreview();
+			});
+		}
+
+		// Icon option click handlers - each icon picker targets its specific input via data-target
+		dialog.querySelectorAll('.picker-icon-options').forEach(iconOptions => {
 			iconOptions.addEventListener('click', (e) => {
 				const option = e.target.closest('.nc-icon-option');
 				if (option) {
 					const icon = option.textContent;
-					iconInput.value = icon;
-					updatePreview();
+					const targetId = iconOptions.dataset.target;
+					const targetInput = dialog.querySelector(`#${targetId}`);
+					if (targetInput) {
+						targetInput.value = icon;
+						updatePreview();
+					}
 					// Brief visual feedback
 					option.style.background = 'var(--color-fg-dim, #666)';
 					setTimeout(() => { option.style.background = ''; }, 150);
 				}
 			});
-		}
+		});
 
 		// Tri-state toggle helper: null (auto) → true → false → null (auto)
 		function cycleTriState(currentState) {
@@ -2574,7 +2642,8 @@
 				${createToggleRow({ label: 'Vary italic', id: 'settings-vary-italic', checked: styleConfig.varyItalic })}
 				${createToggleRow({ label: 'Vary small-caps', id: 'settings-vary-case', checked: styleConfig.varyCase })}
 				${createToggleRow({ label: 'Prepend icon', id: 'settings-prepend-icon', checked: styleConfig.prependIcon })}
-				<div class="nc-input-row-stacked" id="icon-set-container" style="display: ${styleConfig.prependIcon ? 'block' : 'none'}">
+				${createToggleRow({ label: 'Append icon', id: 'settings-append-icon', checked: styleConfig.appendIcon })}
+				<div class="nc-input-row-stacked" id="icon-set-container" style="display: ${(styleConfig.prependIcon || styleConfig.appendIcon) ? 'block' : 'none'}">
 					<label for="settings-icon-set">Icon set (space-separated)</label>
 					<input type="text" id="settings-icon-set" value="${styleConfig.iconSet}" placeholder="● ○ ◆ ◇ ■ □ ▲ △ ★ ☆">
 				</div>
@@ -2616,8 +2685,9 @@
 					if (varyItalicInput) varyItalicInput.checked = DEFAULT_STYLE_CONFIG.varyItalic;
 					if (varyCaseInput) varyCaseInput.checked = DEFAULT_STYLE_CONFIG.varyCase;
 					if (prependIconInput) prependIconInput.checked = DEFAULT_STYLE_CONFIG.prependIcon;
+					if (appendIconInput) appendIconInput.checked = DEFAULT_STYLE_CONFIG.appendIcon;
 					if (iconSetInput) iconSetInput.value = DEFAULT_STYLE_CONFIG.iconSet;
-					if (iconSetContainer) iconSetContainer.style.display = DEFAULT_STYLE_CONFIG.prependIcon ? 'block' : 'none';
+					if (iconSetContainer) iconSetContainer.style.display = (DEFAULT_STYLE_CONFIG.prependIcon || DEFAULT_STYLE_CONFIG.appendIcon) ? 'block' : 'none';
 					presetSelect.value = '';
 					updatePreview();
 				}},
@@ -2628,9 +2698,9 @@
 		const presetSelect = dialog.querySelector('#settings-preset');
 		const previewRow = dialog.querySelector('#settings-preview');
 		const previewNames = [
-			'z0ylent', 'CyB3rPuNk', 'n30n_gh0st', 'ZeR0C00L', 'an0nym0us',
-			'Ph4nt0m_', 'enki', 'genghis_khan', 'ByteMe99', 'neo', 'l1sb3th',
-			'Da5idMeier', 'N3tRuNn3r', 'acidBurn', 'fr33Kevin', 'triNity'
+			'z0ylent', 'CyB3rPuNk', 'ZeR0C00L', 'an0nym0us',
+			'Ph4nt0m_', 'enki', 'genghis_khan', 'ByteMe99', 'neo', 
+			'l1sb3th', 'N3tRuNn3r', 'acidBurn', 'fr33Kevin', 'triNity'
 		];
 		previewNames.forEach(name => {
 			const span = document.createElement('span');
@@ -2676,6 +2746,7 @@
 		const varyItalicInput = dialog.querySelector('#settings-vary-italic');
 		const varyCaseInput = dialog.querySelector('#settings-vary-case');
 		const prependIconInput = dialog.querySelector('#settings-prepend-icon');
+		const appendIconInput = dialog.querySelector('#settings-append-icon');
 		const iconSetInput = dialog.querySelector('#settings-icon-set');
 		const iconSetContainer = dialog.querySelector('#icon-set-container');
 
@@ -2686,7 +2757,7 @@
 			return {
 				color: { minHue, maxHue, minSaturation, maxSaturation, minLightness, maxLightness, excludeRanges: colorConfig.excludeRanges, contrastThreshold: contrastSlider.getValue() },
 				siteTheme: { useHueRange: siteHueInput?.checked || false, hueSpread: hueSpreadSlider.getValue(), useSaturation: siteSaturationInput?.checked || false, useLightness: siteLightnessInput?.checked || false },
-				style: { varyWeight: varyWeightInput?.checked || false, varyItalic: varyItalicInput?.checked || false, varyCase: varyCaseInput?.checked || false, prependIcon: prependIconInput?.checked || false, iconSet: iconSetInput?.value || '' }
+				style: { varyWeight: varyWeightInput?.checked || false, varyItalic: varyItalicInput?.checked || false, varyCase: varyCaseInput?.checked || false, prependIcon: prependIconInput?.checked || false, appendIcon: appendIconInput?.checked || false, iconSet: iconSetInput?.value || '' }
 			};
 		}
 
@@ -2776,7 +2847,12 @@
 
 				// Apply icon using helper
 				const icon = getHashBasedIcon(username, s);
-				el.textContent = icon ? icon + ' ' + username : username;
+				let displayText = username;
+				if (icon) {
+					if (s.prependIcon) displayText = icon + ' ' + displayText;
+					if (s.appendIcon) displayText = displayText + ' ' + icon;
+				}
+				el.textContent = displayText;
 			});
 		}
 
@@ -2892,7 +2968,7 @@
 		});
 
 		// Style variation toggles
-		[varyWeightInput, varyItalicInput, varyCaseInput, prependIconInput].forEach(el => {
+		[varyWeightInput, varyItalicInput, varyCaseInput, prependIconInput, appendIconInput].forEach(el => {
 			if (!el) return;
 			el.addEventListener('change', () => {
 				updateToggle(el);
@@ -2900,11 +2976,17 @@
 			});
 		});
 
-		// Show/hide icon set input when prepend icon is toggled
+		// Show/hide icon set input when prepend or append icon is toggled
+		const updateIconSetVisibility = () => {
+			if (iconSetContainer) {
+				iconSetContainer.style.display = (prependIconInput?.checked || appendIconInput?.checked) ? 'block' : 'none';
+			}
+		};
 		if (prependIconInput) {
-			prependIconInput.addEventListener('change', () => {
-				if (iconSetContainer) iconSetContainer.style.display = prependIconInput.checked ? 'block' : 'none';
-			});
+			prependIconInput.addEventListener('change', updateIconSetVisibility);
+		}
+		if (appendIconInput) {
+			appendIconInput.addEventListener('change', updateIconSetVisibility);
 		}
 
 		// Update preview when icon set changes
