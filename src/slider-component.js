@@ -5,7 +5,7 @@
 // Shared slider styles (injected once)
 const sliderStyles = document.createElement('style');
 sliderStyles.textContent = `
-	.nc-slider { position: relative; height: 24px; margin: 0.5rem 0; }
+	.nc-slider { position: relative; height: 24px; margin: 0.5rem 0 0.25rem; }
 	.nc-slider-track {
 		position: absolute;
 		inset: 4px 0;
@@ -47,8 +47,14 @@ sliderStyles.textContent = `
 	}
 	.nc-slider.nc-slider-split .nc-slider-thumb { height: 32px; }
 	.nc-slider-labels {
-		display: flex; justify-content: space-between; margin-top: 2px;
-		font-size: 0.625rem; color: var(--color-fg-dim, #888);
+		display: flex; 
+		justify-content: space-between; 
+		font-size: calc(var(--font-size-base, 1rem) * 0.625);
+		line-height: calc(var(--font-size-base, 1rem) * 0.625);
+		margin-bottom: 0.5rem;
+	}
+	.nc-slider-labels, .nc-slider-labels span {
+		color: var(--color-fg-dim, #888);
 	}
 	/* Simple single-value slider style */
 	.nc-slider.nc-slider-simple { height: 16px; }
@@ -80,7 +86,7 @@ function createSlider(opts) {
 
 	const container = document.createElement('div');
 	container.innerHTML = `
-		${label ? `<label style="display:block;margin:0.5rem 0 0.25rem;font-size:0.75rem;color:var(--color-fg-dim,#888)">${label}</label>` : ''}
+		${label ? `<label>${label}</label>` : ''}
 		<div class="nc-slider${simple ? ' nc-slider-simple' : ''}">
 			<div class="nc-slider-track-mapped"></div>
 			<div class="nc-slider-track"></div>

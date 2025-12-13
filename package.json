@@ -4,7 +4,10 @@
   "description": "A userscript that adds consistent, hash-based colors to usernames on [Cyberspace](https://cyberspace.online). Created because I can't handle users all being the same color in a chatroom, it gives me a headache.",
   "main": "build.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "build": "node build.js"
   },
   "repository": {
     "type": "git",
@@ -14,6 +17,9 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "terser": "^5.44.1"
+    "@vitest/coverage-v8": "^4.0.15",
+    "jsdom": "^27.0.1",
+    "terser": "^5.44.1",
+    "vitest": "^3.2.4"
   }
 }

@@ -25,15 +25,26 @@ const OVERRIDES_URL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/ra
 // Add local overrides here for testing, or they will be fetched from OVERRIDES_URL
 let MANUAL_OVERRIDES = {};
 
-// Try to read site's custom theme from localStorage
+// Try to read site's theme
+// Priority: 1. custom_theme from localStorage (user's custom colors)
+//           2. data-theme from <body> -> lookup in PRESET_THEMES (done after PRESET_THEMES is defined)
 let siteTheme = null;
+let siteThemeName = null;
 try {
+	// First try custom_theme (full color customization)
 	const customThemeStr = localStorage.getItem('custom_theme');
 	if (customThemeStr) {
 		siteTheme = JSON.parse(customThemeStr);
 	}
 } catch (e) {
 	console.log('[Nick Colors] Could not parse site custom_theme:', e);
+}
+
+// Get theme name from body data attribute
+try {
+	siteThemeName = document.body?.dataset?.theme || null;
+} catch (e) {
+	// Body might not be ready yet
 }
 
 // Default color generation settings
@@ -44,8 +55,7 @@ const DEFAULT_COLOR_CONFIG = {
 	maxLightness: 75,    // 0-100, max lightness
 	minHue: 0,           // starting hue (0 = red)
 	maxHue: 360,         // ending hue (360 = back to red)
-	excludeRanges: [],   // exclude hue ranges, e.g., [[40,70]] to skip muddy yellows
-	contrastThreshold: 50, // 0-50, add outline if lightness contrast below this (0 = disabled)
+	contrastThreshold: 4.5, // WCAG contrast ratio threshold (1-21). 0=disabled, 3=large text, 4.5=AA, 7=AAA
 };
 
 // Default style variation settings
@@ -106,47 +116,40 @@ const INVERTED_CONTAINERS = [
 ];
 
 // Preset themes matching cyberspace.online site themes
+// Each theme has: fg (foreground), bg (background), and color config for nick generation
 const PRESET_THEMES = {
-	'Full Spectrum': {
-		color: { ...DEFAULT_COLOR_CONFIG }
-	},
-	// Dark: fg #efe5c0 (warm cream, ~45° hue)
-	'Dark': {
-		color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// Light: fg #000 (black text on light bg - needs high contrast colors)
-	'Light': {
-		color: { minSaturation: 70, maxSaturation: 90, minLightness: 30, maxLightness: 45, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// C64: fg white on blue bg #2a2ab8 - retro blue theme
-	'C64': {
-		color: { minSaturation: 70, maxSaturation: 90, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 280, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// VT320: fg #ff9a10 (orange, ~35° hue) - amber terminal
-	'VT320': {
-		color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 15, maxHue: 55, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// Matrix: fg rgba(160,224,68,.9) (green, ~85° hue) - green terminal
-	'Matrix': {
-		color: { minSaturation: 75, maxSaturation: 95, minLightness: 45, maxLightness: 60, minHue: 70, maxHue: 140, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// Poetry: fg #222 (dark text on light bg) - elegant minimal
-	'Poetry': {
-		color: { minSaturation: 40, maxSaturation: 60, minLightness: 30, maxLightness: 45, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// Brutalist: fg #c0d0e8 (cool blue-gray, ~220° hue)
-	'Brutalist': {
-		color: { minSaturation: 50, maxSaturation: 70, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 260, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// GRiD: fg #fea813 (orange, ~40° hue) - warm amber
-	'GRiD': {
-		color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 20, maxHue: 60, excludeRanges: [], contrastThreshold: 50 }
-	},
-	// System: fg #efe5c0 (same as Dark)
-	'System': {
-		color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, excludeRanges: [], contrastThreshold: 50 }
-	},
+	'Full Spectrum': { fg: '#e0e0e0', bg: '#0a0a0a', color: { minSaturation: 70, maxSaturation: 100, minLightness: 55, maxLightness: 75, minHue: 0, maxHue: 360, contrastThreshold: 4.5 } },
+	'z0ylent': { fg: '#91ff00', bg: '#060f04', color: { minSaturation: 80, maxSaturation: 100, minLightness: 45, maxLightness: 65, minHue: 60, maxHue: 150, contrastThreshold: 4.5 } },
+	'Dark': { fg: '#efe5c0', bg: '#000000', color: { minSaturation: 12, maxSaturation: 60, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 70, contrastThreshold: 4.5 } },
+	'Light': { fg: '#000000', bg: '#efe5c0', color: { minSaturation: 12, maxSaturation: 60, minLightness: 30, maxLightness: 45, minHue: 344, maxHue: 44, contrastThreshold: 4.5 } },
+	'C64': { fg: '#bfbfbf', bg: '#2a2ab8', color: { minSaturation: 70, maxSaturation: 90, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 280, contrastThreshold: 4.5 } },
+	'VT320': { fg: '#ff9a10', bg: '#170800', color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 15, maxHue: 55, contrastThreshold: 4.5 } },
+	'Matrix': { fg: '#a0e044', bg: '#000000', color: { minSaturation: 75, maxSaturation: 95, minLightness: 45, maxLightness: 60, minHue: 70, maxHue: 140, contrastThreshold: 4.5 } },
+	'Poetry': { fg: '#222222', bg: '#fefaf8', color: { minSaturation: 0, maxSaturation: 35, minLightness: 30, maxLightness: 45, minHue: 339, maxHue: 46, contrastThreshold: 4.5 } },
+	'Brutalist': { fg: '#c0d0e8', bg: '#080810', color: { minSaturation: 50, maxSaturation: 70, minLightness: 60, maxLightness: 75, minHue: 180, maxHue: 260, contrastThreshold: 4.5 } },
+	'GRiD': { fg: '#fea813', bg: '#180f06', color: { minSaturation: 90, maxSaturation: 100, minLightness: 50, maxLightness: 65, minHue: 20, maxHue: 60, contrastThreshold: 4.5 } },
+	'System': { fg: '#efe5c0', bg: '#000000', color: { minSaturation: 60, maxSaturation: 80, minLightness: 65, maxLightness: 80, minHue: 0, maxHue: 360, contrastThreshold: 4.5 } },
 };
+
+// Helper to get theme colors from preset by name
+function getPresetTheme(themeName) {
+	if (!themeName) return null;
+	// Try exact match first, then case-insensitive
+	if (PRESET_THEMES[themeName]) return PRESET_THEMES[themeName];
+	const lowerName = themeName.toLowerCase();
+	for (const [name, preset] of Object.entries(PRESET_THEMES)) {
+		if (name.toLowerCase() === lowerName) return preset;
+	}
+	return null;
+}
+
+// If no custom theme, try to use preset theme colors from body data-theme
+if (!siteTheme && siteThemeName) {
+	const preset = getPresetTheme(siteThemeName);
+	if (preset && preset.fg && preset.bg) {
+		siteTheme = { fg: preset.fg, bg: preset.bg };
+	}
+}
 
 // Parse site theme HSL values if available
 let siteThemeHsl = null;

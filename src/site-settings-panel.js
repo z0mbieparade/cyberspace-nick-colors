@@ -54,13 +54,13 @@
 				<div id="lit-slider-container"></div>
 				<hr />
 				<h4>Contrast</h4>
-				<div class="hint" style="margin-top: -0.25rem; margin-bottom: 0.25rem;">
-					Reverse foreground and background when lightness contrast is below threshold (0 = disabled)
+				<div class="hint">
+					Auto-invert colors when WCAG contrast ratio is below threshold (0 = disabled, 3 = large text, 4.5 = AA, 7 = AAA)
 				</div>
 				<div id="contrast-slider-container"></div>
 				<hr />
 				<h4>Style Variation</h4>
-				<div class="hint" style="margin-top: -0.25rem; margin-bottom: 0.25rem;">
+				<div class="hint">
 					Add non-color variation to usernames (useful for limited color ranges)
 				</div>
 				${createToggleRow({ label: 'Vary font weight', id: 'settings-vary-weight', checked: styleConfig.varyWeight })}
@@ -150,8 +150,8 @@
 			label: 'Lightness Range', onChange: updatePreview
 		});
 		const contrastSlider = createSlider({
-			simple: true, min: 0, max: 50, value: colorConfig.contrastThreshold || 50,
-			label: 'Contrast Threshold', onChange: updatePreview
+			simple: true, min: 0, max: 21, step: 0.5, value: colorConfig.contrastThreshold || 4.5,
+			label: 'Contrast Threshold (WCAG ratio)', onChange: updatePreview
 		});
 		const hueSpreadSlider = createSlider({
 			simple: true, min: 5, max: 180, value: siteThemeConfig.hueSpread,
@@ -192,7 +192,7 @@
 			const [minSaturation, maxSaturation] = satSlider.getValues();
 			const [minLightness, maxLightness] = litSlider.getValues();
 			return {
-				color: { minHue, maxHue, minSaturation, maxSaturation, minLightness, maxLightness, excludeRanges: colorConfig.excludeRanges, contrastThreshold: contrastSlider.getValue() },
+				color: { minHue, maxHue, minSaturation, maxSaturation, minLightness, maxLightness, contrastThreshold: contrastSlider.getValue() },
 				siteTheme: {
 					useHueRange: siteHueInput?.checked || false,
 					hueSpread: hueSpreadSlider.getValue(),
@@ -256,7 +256,12 @@
 		function updatePreview() {
 			updateGradients();
 			const eff = getEffective();
-			const bgLightness = getBackgroundLightness();
+			const bgRgb = getBackgroundRgb();
+
+			// Temporarily apply dialog settings to global config for generateStyles
+			const savedColorConfig = { ...colorConfig };
+			Object.assign(colorConfig, eff);
+
 			previewRow.querySelectorAll('.preview-nick').forEach((el, i) => {
 				const username = previewNames[i];
 
@@ -280,9 +285,11 @@
 					const litRange = eff.maxLightness - eff.minLightness;
 					const lit = eff.minLightness + (hash3 % Math.max(1, litRange + 1));
 					const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
-					// Invert colors if contrast is below threshold
-					const threshold = eff.contrastThreshold || 50;
-					if (threshold > 0 && Math.abs(lit - bgLightness) < threshold) {
+					// Invert colors if WCAG contrast ratio is below threshold
+					const threshold = eff.contrastThreshold || 4.5;
+					const colorRgb = hslToRgb(hue, sat, lit);
+					const contrastRatio = getContrastRatio(colorRgb, bgRgb);
+					if (threshold > 0 && contrastRatio < threshold) {
 						el.style.backgroundColor = color;
 						el.style.color = 'var(--color-fg, #fff)';
 						el.style.padding = '0 0.25em';
@@ -307,6 +314,9 @@
 				}
 				el.textContent = displayText;
 			});
+
+			// Restore original config
+			Object.assign(colorConfig, savedColorConfig);
 		}
 
 		presetSelect.addEventListener('change', () => {
@@ -315,7 +325,7 @@
 				hueSlider.setValues([p.color.minHue, p.color.maxHue]);
 				satSlider.setValues([p.color.minSaturation, p.color.maxSaturation]);
 				litSlider.setValues([p.color.minLightness, p.color.maxLightness]);
-				contrastSlider.setValue(p.color.contrastThreshold || 50);
+				contrastSlider.setValue(p.color.contrastThreshold || 4.5);
 				updatePreview();
 			}
 		});

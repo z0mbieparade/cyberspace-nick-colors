@@ -87,7 +87,7 @@ function createUserSettingsPanel(username, currentStyles) {
 				'Effective Config': `H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`,
 				'Style Variations': `weight:${hashWeight} italic:${hashItalic} case:${hashCase}`
 			})}
-			${hasRemoteOverride ? `<div class="hint" style="margin-bottom: 0.5rem;">Site-wide override: <code style="background: var(--color-code-bg, #222); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
+			${hasRemoteOverride ? `<div class="hint">Site-wide override: <code style="background: var(--color-code-bg, #222); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
 			<h4>Nick Color</h4>
 			<div id="picker-sliders"></div>
 			${createInputRow({
@@ -96,7 +96,7 @@ function createUserSettingsPanel(username, currentStyles) {
 				placeholder: '#ff6b6b or hsl(280, 90%, 65%)',
 				classes: 'no-padding-bottom'
 			})}
-			${isRestricted ? `<div class="hint" style="margin-top: 0.5rem;">Color range is restricted. Preview shows mapped result. Click SETTINGS to adjust.</div>` : ''}
+			${isRestricted ? `<div class="hint">Color range is restricted. Preview shows mapped result. Click SETTINGS to adjust.</div>` : ''}
 			<hr />
 			<h4>Custom Icons</h4>
 			<div class="hint">Prepend/Append a custom character or emoji to the nickname.</div>
@@ -262,14 +262,14 @@ function createUserSettingsPanel(username, currentStyles) {
 
 	// Create sliders with restricted range info and live value display in labels
 	const hueLabel = isHueRestricted
-		? `Hue <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span> <span style="color:var(--color-fg-dim,#888);font-size:0.65rem">→ mapped to ${eff.minHue}-${eff.maxHue}</span>`
-		: `Hue <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span>`;
+		? `Hue <span class="nc-slider-values"></span> <span>→ mapped to ${eff.minHue}-${eff.maxHue}</span>`
+		: `Hue <span class="nc-slider-values"></span>`;
 	const satLabel = isSatRestricted
-		? `Sat <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span> <span style="color:var(--color-fg-dim,#888);font-size:0.65rem">→ mapped to ${eff.minSaturation}-${eff.maxSaturation}</span>`
-		: `Sat <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span>`;
+		? `Sat <span class="nc-slider-values"></span> <span>→ mapped to ${eff.minSaturation}-${eff.maxSaturation}</span>`
+		: `Sat <span class="nc-slider-values"></span>`;
 	const litLabel = isLitRestricted
-		? `Lit <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span> <span style="color:var(--color-fg-dim,#888);font-size:0.65rem">→ mapped to ${eff.minLightness}-${eff.maxLightness}</span>`
-		: `Lit <span class="nc-slider-values" style="color:var(--color-fg-dim,#888);font-size:0.75rem;font-family:monospace"></span>`;
+		? `Lit <span class="nc-slider-values"></span> <span>→ mapped to ${eff.minLightness}-${eff.maxLightness}</span>`
+		: `Lit <span class="nc-slider-values"></span>`;
 
 	const hueSlider = createSlider({ label: hueLabel, min: 0, max: 360, value: 180, onChange: () => { customInput.value = ''; updatePreview(); } });
 	const satSlider = createSlider({ label: satLabel, min: 0, max: 100, value: 85, onChange: () => { customInput.value = ''; updatePreview(); } });
@@ -394,13 +394,14 @@ function createUserSettingsPanel(username, currentStyles) {
 		if (invertState === true) {
 			shouldInvert = true;
 		} else if (invertState === null) {
-			// Auto - check contrast threshold
+			// Auto - check WCAG contrast ratio threshold
 			const hsl = parseColorToHsl(mappedColor);
 			if (hsl) {
-				const bgLightness = getBackgroundLightness();
+				const colorRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
+				const bgRgb = getBackgroundRgb();
 				const threshold = effectiveConfig.contrastThreshold || 0;
-				const contrast = Math.abs(hsl.l - bgLightness);
-				shouldInvert = threshold > 0 && contrast < threshold;
+				const contrastRatio = getContrastRatio(colorRgb, bgRgb);
+				shouldInvert = threshold > 0 && contrastRatio < threshold;
 			}
 		}
 		// invertState === false means explicitly disabled

@@ -103,7 +103,6 @@ const KEY_MAP = {
 	maxLightness: 'xL',
 	minHue: 'mH',
 	maxHue: 'xH',
-	excludeRanges: 'eR',
 	contrastThreshold: 'cT',
 	// Site theme config
 	useHueRange: 'uH',
@@ -267,8 +266,8 @@ function showPasteDialog(callback) {
 				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 			</div>
 			<div class="nc-dialog-content">
-				<div class="hint" style="margin-bottom: 0.5rem;">Paste your settings JSON below (Ctrl+V or right-click → Paste)</div>
-				<textarea id="paste-settings-input" style="min-height: 150px; width: 100%; font-family: monospace; font-size: 0.75rem;" placeholder="Paste settings JSON here..."></textarea>
+				<div class="hint">Paste your settings JSON below (Ctrl+V or right-click → Paste)</div>
+				<textarea id="paste-settings-input" style="min-height: 150px; width: 100%; font-size: var(--font-size-base);" placeholder="Paste settings JSON here..."></textarea>
 			</div>
 			<div class="nc-dialog-footer">
 				<div class="buttons nc-flex nc-items-center nc-gap-2">

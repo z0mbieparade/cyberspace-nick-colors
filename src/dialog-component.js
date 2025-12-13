@@ -43,7 +43,6 @@ dialogStyles.textContent = `
 		border: 1px solid var(--color-border, #333);
 		padding: 0.5rem; 
 		margin: 0.75rem 0;
-		font-size: 0.875rem; 
 	}
 	.nc-dialog .preview-row {
 		display: flex; 
@@ -58,13 +57,16 @@ dialogStyles.textContent = `
 		flex-shrink: 0;
 	}
 	.nc-dialog h3 {
-		margin: 0; color: var(--color-fg, #fff); font-size: 0.875rem;
-		text-transform: uppercase; letter-spacing: 0.05em;
+		margin: 0; color: var(--color-fg, #fff); 
+		font-size: var(--font-size-base, 1rem);
+		text-transform: uppercase; 
+		letter-spacing: 0.05em;
 	}
 	.nc-dialog h4 {
 		margin: 0.5rem 0; color: var(--color-fg, #FFF); 
-		font-size: 0.75rem;
-		text-transform: uppercase; letter-spacing: 0.1em;
+		font-size: var(--font-size-base, 1rem);
+		text-transform: uppercase; 
+		letter-spacing: 0.1em;
 	}
 	.nc-dialog h4:first-child { margin-top: 0; padding-top: 0; }
 	.nc-dialog hr {
@@ -97,12 +99,12 @@ dialogStyles.textContent = `
 	}
 	.nc-dialog .nc-input-row label
 	{
-		font-size: 0.75rem;
+		font-size: calc(var(--font-size-base) * 0.875);
 		color: var(--color-fg, #fff);
 	}
-	.nc-dialog .nc-input-row .hint
+	.nc-dialog .hint
 	{
-		font-size: 0.6rem;
+		font-size: calc(var(--font-size-base, 1rem) * 0.875);
 		color: var(--color-fg-dim, #fff);
 	}
 	.nc-dialog .buttons { 
@@ -132,7 +134,7 @@ dialogStyles.textContent = `
 	.nc-dialog button.nc-inline-btn {
 		flex: 0 0 auto;
 		padding: 0.25rem 0.75rem;
-		font-size: 0.75rem;
+		font-size: var(--font-size-base);
 		background: var(--color-bg, #0a0a0a);
 		border: 1px solid var(--color-border, #333);
 		color: var(--color-fg-dim, #888);
@@ -144,13 +146,16 @@ dialogStyles.textContent = `
 		color: var(--color-fg, #fff);
 	}
 	.nc-dialog input[type="text"], .nc-dialog textarea, .nc-dialog select {
-		width: 100%; padding: 0.5rem; background: var(--color-bg, #0a0a0a);
-		border: 1px solid var(--color-border, #333); color: var(--color-fg, #fff);
-		font-family: inherit; font-size: 0.75rem; box-sizing: border-box;
+		width: 100%; padding: 0.5rem; 
+		background: var(--color-bg, #0a0a0a);
+		border: 1px solid var(--color-border, #333); 
+		color: var(--color-fg, #fff);
+		font-family: inherit; 
+		font-size: var(--font-size-base);
+		box-sizing: border-box;
 	}
 	.nc-dialog textarea { min-height: 70px; resize: vertical; }
 	.nc-dialog .nc-toggle { display: flex; margin: 0.5rem 0; }
-	.nc-dialog .hint { font-size: 0.625rem; color: var(--color-fg-dim, #666); margin-top: 0.25rem; }
 
 	/* Toggle component styles */
 	.nc-dialog .nc-toggle-label {
@@ -161,7 +166,7 @@ dialogStyles.textContent = `
 		flex-shrink: 0;
 	}
 	.nc-dialog .nc-toggle-value {
-		font-size: 0.75rem;
+		font-size: var(--font-size-base);
 		color: var(--color-fg-dim, #888);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
@@ -212,11 +217,14 @@ dialogStyles.textContent = `
 		justify-content: flex-end;
 		gap: 0.5rem;
 		border-top: 1px dotted var(--color-border, #333);
-		margin-top: 0.3rem; font-size: 0.625rem; color: var(--color-fg-dim, #666);
+		margin-top: 0.3rem; 
+		font-size: calc(var(--font-size-base) * 0.875);
+		color: var(--color-fg-dim, #666);
 		padding-top: 0.3rem;
 	}
 	
 	.nc-dialog .nc-dialog-warning {
+		font-size: calc(var(--font-size-base) * 0.875);
 		color: rgba(255, 183, 0, 0.7);
 	}
 

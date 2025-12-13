@@ -88,24 +88,37 @@ function getRawStylesForPicker(username) {
 function generateStyles(username) {
 	let styles = {};
 	const effectiveConfig = getEffectiveColorConfig();
+	const threshold = effectiveConfig.contrastThreshold || 0;
 
 	// Get per-user invert setting (true, false, or undefined for auto)
 	const userInvertSetting = customNickColors[username]?.invert;
 
+	// Check for override with backgroundColor (special handling)
+	const override = MANUAL_OVERRIDES[username];
+	if (override && override.backgroundColor) {
+		// Apply full range mapping to both fg and bg colors
+		const mappedBg = applyRangeMappingToHex(override.backgroundColor, effectiveConfig);
+		const mappedFg = override.color ? applyRangeMappingToHex(override.color, effectiveConfig) : null;
+		styles.backgroundColor = mappedBg ? mappedBg.color : override.backgroundColor;
+		styles.color = mappedFg ? mappedFg.color : (override.color || 'var(--color-fg, #fff)');
+		styles.padding = '0 0.25em';
+
+		// Copy non-color properties
+		const overrideCopy = { ...override };
+		delete overrideCopy.color;
+		delete overrideCopy.backgroundColor;
+		styles = { ...styles, ...overrideCopy };
+
+		return styles;
+	}
+
 	// Get base color and apply site-wide range mapping
 	const baseColor = getBaseColor(username);
 	const mappedColor = applyRangeMapping(baseColor, effectiveConfig);
-
-	// Handle hue exclusion by shifting
-	let finalHue = mappedColor.h;
-	let attempts = 0;
-	while (isHueExcluded(finalHue, effectiveConfig) && attempts < 36) {
-		finalHue = (finalHue + 10) % 360;
-		attempts++;
-	}
+	const colorRgb = hslToRgb(mappedColor.h, mappedColor.s, mappedColor.l);
 
 	// Set the display color
-	styles.color = `hsl(${finalHue}, ${mappedColor.s}%, ${mappedColor.l}%)`;
+	styles.color = `hsl(${mappedColor.h}, ${mappedColor.s}%, ${mappedColor.l}%)`;
 
 	// Copy non-color properties from custom save or override
 	if (customNickColors[username] && typeof customNickColors[username] === 'object') {
@@ -113,10 +126,10 @@ function generateStyles(username) {
 		delete custom.color;
 		delete custom.invert;
 		styles = { ...styles, ...custom };
-	} else if (MANUAL_OVERRIDES[username] && typeof MANUAL_OVERRIDES[username] === 'object') {
-		const override = { ...MANUAL_OVERRIDES[username] };
-		delete override.color;
-		styles = { ...styles, ...override };
+	} else if (override && typeof override === 'object') {
+		const overrideCopy = { ...override };
+		delete overrideCopy.color;
+		styles = { ...styles, ...overrideCopy };
 	}
 
 	// Handle inversion based on per-user setting or auto contrast
@@ -128,22 +141,19 @@ function generateStyles(username) {
 		// User explicitly disabled inversion
 		shouldInvert = false;
 	} else {
-		// Auto: check contrast threshold
-		const threshold = effectiveConfig.contrastThreshold || 0;
-		if (threshold > 0 && styles.color && !styles.backgroundColor) {
-			const hsl = parseColorToHsl(styles.color);
-			if (hsl) {
-				const bgLightness = getBackgroundLightness();
-				const contrast = Math.abs(hsl.l - bgLightness);
-				shouldInvert = contrast < threshold;
-			}
+		// Auto: check WCAG contrast ratio threshold
+		if (threshold > 0 && !styles.backgroundColor) {
+			const bgRgb = getBackgroundRgb();
+			const contrastRatio = getContrastRatio(colorRgb, bgRgb);
+			shouldInvert = contrastRatio < threshold;
 		}
 	}
 
-	if (shouldInvert && styles.color && !styles.backgroundColor) {
-		// Swap: color becomes background, use page foreground for text (ensures contrast)
-		styles.backgroundColor = styles.color;
-		styles.color = 'var(--color-fg, #fff)';
+	if (shouldInvert && !styles.backgroundColor) {
+		// Get best text color and potentially adjusted background
+		const inverted = getInvertedColors(colorRgb, styles.color, threshold);
+		styles.backgroundColor = inverted.backgroundColor;
+		styles.color = inverted.textColor;
 		styles.padding = '0 0.25em';
 	}
 
@@ -224,24 +234,83 @@ function getIconsForUsername(username) {
 
 function applyStyles(element, username) {
 	const styles = generateStyles(username);
+	const effectiveConfig = getEffectiveColorConfig();
+	const threshold = effectiveConfig.contrastThreshold || 0;
 
 	// Check if element is in an inverted container
 	const isInverted = INVERTED_CONTAINERS.length > 0 &&
 		INVERTED_CONTAINERS.some(sel => element.closest(sel));
 
 	if (isInverted) {
-		// In inverted containers, check if we already have contrast-based inversion
+		// Inverted container has theme.fg as background, theme.bg as text
+		// We need to recalculate contrast against theme.fg (the container's bg)
+		const containerBgRgb = getForegroundRgb(); // theme.fg is the container's bg
+		const pageBgRgb = getBackgroundRgb();
+
 		if (styles.backgroundColor) {
-			// Already inverted by contrast threshold - reverse it back to normal
-			styles.color = styles.backgroundColor;
-			delete styles.backgroundColor;
-			delete styles.padding;
+			// Already has a background - check contrast against container bg
+			const bgHsl = parseColorToHsl(styles.backgroundColor);
+			if (bgHsl) {
+				const bgRgb = hslToRgb(bgHsl.h, bgHsl.s, bgHsl.l);
+				const contrastWithContainer = getContrastRatio(bgRgb, containerBgRgb);
+
+				if (threshold > 0 && contrastWithContainer < threshold) {
+					// Nick bg has poor contrast with container bg - adjust it
+					const adjusted = adjustBgForContrast(bgRgb, containerBgRgb, threshold);
+					if (adjusted) {
+						styles.backgroundColor = adjusted;
+						// Recalculate text color for new background
+						const adjustedHsl = parseColorToHsl(adjusted);
+						if (adjustedHsl) {
+							const adjustedRgb = hslToRgb(adjustedHsl.h, adjustedHsl.s, adjustedHsl.l);
+							const fgContrast = getContrastRatio(containerBgRgb, adjustedRgb);
+							const bgContrast = getContrastRatio(pageBgRgb, adjustedRgb);
+							styles.color = bgContrast > fgContrast ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
+						}
+					}
+				} else {
+					// Good contrast with container - pick best text color
+					const fgContrast = getContrastRatio(containerBgRgb, bgRgb);
+					const bgContrast = getContrastRatio(pageBgRgb, bgRgb);
+					styles.color = bgContrast > fgContrast ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
+				}
+			}
 		} else if (styles.color) {
-			// Normal color - invert it for the container
-			// Use --color-bg for text since container background is already inverted (light)
-			styles.backgroundColor = styles.color;
-			styles.color = 'var(--color-bg, #000)';
-			styles.padding = '0 0.25rem';
+			// Normal color - check if it needs inversion for the inverted container
+			const colorHsl = parseColorToHsl(styles.color);
+			if (colorHsl) {
+				const colorRgb = hslToRgb(colorHsl.h, colorHsl.s, colorHsl.l);
+				const contrastRatio = getContrastRatio(colorRgb, containerBgRgb);
+
+				if (threshold > 0 && contrastRatio < threshold) {
+					// Need to invert for the container
+					// Use the nick color as background, but adjust if needed for container contrast
+					let bgRgb = colorRgb;
+					let bgColor = styles.color;
+					const bgContrastWithContainer = getContrastRatio(colorRgb, containerBgRgb);
+
+					if (bgContrastWithContainer < threshold) {
+						// Nick color also has poor contrast as a bg - adjust it
+						const adjusted = adjustBgForContrast(colorRgb, containerBgRgb, threshold);
+						if (adjusted) {
+							bgColor = adjusted;
+							const adjustedHsl = parseColorToHsl(adjusted);
+							if (adjustedHsl) {
+								bgRgb = hslToRgb(adjustedHsl.h, adjustedHsl.s, adjustedHsl.l);
+							}
+						}
+					}
+
+					// Pick text color based on contrast with the (possibly adjusted) background
+					const fgContrast = getContrastRatio(containerBgRgb, bgRgb);
+					const bgContrast = getContrastRatio(pageBgRgb, bgRgb);
+					const textColor = bgContrast > fgContrast ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
+
+					styles.backgroundColor = bgColor;
+					styles.color = textColor;
+					styles.padding = '0 0.25rem';
+				}
+			}
 		}
 	}
 

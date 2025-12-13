@@ -90,20 +90,20 @@ function showReportIssueDialog() {
 				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 			</div>
 			<div class="nc-dialog-content">
-				<div class="hint" style="margin-bottom: 0.75rem;">Fill out the fields below to report an issue. All fields are required.</div>
-				<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+				<div class="hint">Fill out the fields below to report an issue. All fields are required.</div>
+				<div class="nc-input-row">
 					<label for="report-issue">What issue are you experiencing?</label>
 					<textarea id="report-issue" placeholder="Describe the problem..." style="width: 100%; min-height: 60px;"></textarea>
 				</div>
-				<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+				<div class="nc-input-row">
 					<label for="report-steps">Steps to reproduce:</label>
 					<textarea id="report-steps" placeholder="1. Go to...\n2. Click on...\n3. See error..." style="width: 100%; min-height: 60px;"></textarea>
 				</div>
-				<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+				<div class="nc-input-row">
 					<label for="report-errors">Any error messages? (check browser console)</label>
 					<input type="text" id="report-errors" placeholder="Optional - paste any errors" style="width: 100%;">
 				</div>
-				<div class="hint" style="margin-top: 0.5rem; font-size: 0.7rem;">Debug info will be automatically included.</div>
+				<div class="hint">Debug info will be automatically included.</div>
 			</div>
 			<div class="nc-dialog-footer">
 				<div class="buttons nc-flex nc-items-center nc-gap-2">
