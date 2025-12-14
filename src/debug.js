@@ -1,3 +1,47 @@
+
+
+/**
+	* Creates a debug pre element (hidden when DEBUG is false, but still in DOM for export)
+	* @param {Object|string} data - Object with label/value pairs, or plain string for unlabeled content
+	* @param {string} [classes] - Additional CSS classes
+	* @returns {string} HTML string
+	*/
+function createDebugPre(data, classes = '') {
+	const hiddenStyle = DEBUG ? '' : ' style="display: none;"';
+	const classStr = `nc-dialog-debug${classes ? ' ' + classes : ''}`;
+	if (typeof data === 'string') {
+		return `<div class="${classStr}"${hiddenStyle}>${data}</div>`;
+	}
+	console.log(data);
+	const lines = Object.entries(data)
+		.map(([label, value]) => {
+			if(typeof value === 'object' && (value.txt !== undefined || value.elem !== undefined))
+				return `<span><strong>${label}:</strong><span>${value.txt ?? ' N/A'}${value.elem ? ' ' + value.elem : ''}</span></span>`;
+			else if(typeof value === 'string')
+				return `<span><strong>${label}:</strong><span>${value ?? 'N/A'}</span></span>`;
+		})
+		.filter(line => line && line.trim() !== '')
+		.join('\n').trim();
+	return `<div class="${classStr}"${hiddenStyle}>\n${lines}\n</div>`;
+}
+
+/**
+	* Gets or creates a debug pre element under a parent (for dynamic updates)
+	* @param {HTMLElement} parent - Parent element to append to
+	* @param {string} [classes] - Additional CSS classes
+	* @returns {HTMLElement} The debug element (hidden if DEBUG is false)
+	*/
+function getOrCreateDebugPre(parent, classes = '') {
+	let debug = parent.querySelector('.nc-dynamic-debug');
+	if (!debug) {
+		debug = document.createElement('div');
+		debug.className = `nc-dynamic-debug nc-dialog-debug${classes ? ' ' + classes : ''}`;
+		parent.appendChild(debug);
+	}
+	debug.style.display = DEBUG ? '' : 'none';
+	return debug;
+}
+
 /**
  * Export debug logs for troubleshooting (returns plain text)
  */
@@ -18,7 +62,7 @@ function exportDebugLogs() {
 	lines.push('SITE THEME');
 	lines.push('-'.repeat(60));
 	lines.push(`Site Theme: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
-	lines.push(`Site Theme HSL: ${siteThemeHsl ? JSON.stringify(siteThemeHsl) : 'none'}`);
+	lines.push(`Site Theme Fg HSL: ${siteThemeFgHSL ? JSON.stringify(siteThemeFgHSL) : 'none'}`);
 	lines.push('');
 
 	lines.push('-'.repeat(60));

@@ -205,7 +205,7 @@ describe('Contrast and Inversion', () => {
 
 			expect(styles.backgroundColor).toBeDefined();
 			// Text color is now chosen based on which contrasts better with the bg
-			expect(styles.color).toMatch(/^var\(--color-(fg|bg)/);
+			expect(styles.color).toMatch(/^var\(--nc-(fg|bg)\)/);
 			expect(styles.padding).toBe('0 0.25em');
 		});
 
@@ -258,7 +258,7 @@ describe('Contrast and Inversion', () => {
 			const styles = generateStyles('fgtest');
 
 			// Text color is now chosen based on which contrasts better with the bg
-			expect(styles.color).toMatch(/^var\(--color-(fg|bg)/);
+			expect(styles.color).toMatch(/^var\(--nc-(fg|bg)\)/);
 		});
 
 		it('adds padding when inverting', () => {
@@ -292,7 +292,7 @@ describe('Contrast and Inversion', () => {
 			// Should keep the custom background
 			expect(styles.backgroundColor).toBe('hsl(0, 0%, 20%)');
 			// Color should not be changed to foreground variable
-			expect(styles.color).not.toBe('var(--color-fg, #fff)');
+			expect(styles.color).not.toBe('var(--nc-fg)');
 		});
 	});
 
@@ -310,7 +310,7 @@ describe('Contrast and Inversion', () => {
 
 			expect(el.style.backgroundColor).toBeTruthy();
 			// Text color is now chosen based on which contrasts better with the bg
-			expect(el.style.color).toMatch(/^var\(--color-(fg|bg)/);
+			expect(el.style.color).toMatch(/^var\(--nc-(fg|bg)\)/);
 			expect(el.style.padding).toBe('0px 0.25em'); // Browser normalizes to px
 		});
 
@@ -322,7 +322,7 @@ describe('Contrast and Inversion', () => {
 			applyStyles(el, 'normaluser');
 
 			expect(el.style.color).toBeTruthy();
-			expect(el.style.color).not.toBe('var(--color-fg, #fff)');
+			expect(el.style.color).not.toBe('var(--nc-fg)');
 			expect(el.style.backgroundColor).toBe('');
 		});
 	});

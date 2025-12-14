@@ -3,69 +3,159 @@
 // =====================================================
 //
 // Flow:
-// 1. getBaseColor(username) → raw HSL (0-360, 0-100, 0-100)
+// 1. getNickBase(username) → raw HSL (0-360, 0-100, 0-100)
 //    - From custom save, override, or hash generation
-// 2. applyRangeMapping(hsl, config) → mapped HSL (within site ranges)
+// 2. applyRangeMappingToColor(hsl, config) → mapped HSL (within site ranges)
 //    - Proportionally maps base color to configured ranges
 // 3. Display always shows mapped result
 // 4. Picker shows raw values, preview shows mapped result
 // =====================================================
 
 /**
- * Generate base (raw) HSL color for a username
+ * Strip config only values from style object and convert colors to HSL if necessary
+ * @param {Object} styles - Style object with potential color properties
+ * @returns {Object} - Cleaned style object with colors in HSL format
+ */
+function makeStylesObject(styles)
+{
+	delete styles.appendIcon;
+	delete styles.prependIcon;
+	delete styles.invert;
+
+	for(const key in styles)
+	{
+		if(key.startsWith('color') && typeof styles[key] !== 'string')
+		{
+			const color = parseColor(styles[key], 'hsl');
+			if(color)
+				styles[key] = color;
+			else 
+				delete styles[key];
+		}
+		else if (key.startsWith('base'))
+		{
+			delete styles[key];
+		}
+	}
+
+	return styles;
+}
+
+/**
+ * Get the base color/styles for a username
+ * First checks for user-saved custom color,
+ * then checks for remote/manual overrides,
+ * and finally generates from hash if none are set.
  * Returns { h, s, l } in full range (h: 0-360, s: 0-100, l: 0-100)
  */
-function getBaseColor(username) {
+function getNickBase(username, includeStyles = false, colorFormat = 'hsl') 
+{
+	let styles = {
+		color: null
+	};
+
 	// Check user-saved custom color first
 	if (customNickColors[username]) {
 		const custom = customNickColors[username];
 		const colorStr = typeof custom === 'string' ? custom : custom.color;
 		if (colorStr) {
-			const hsl = parseColorToHsl(colorStr);
-			if (hsl) return hsl;
+			const parsedColor = parseColor(colorStr, colorFormat);
+			if (parsedColor) styles.color = parsedColor;
 		}
+
+		if(includeStyles && typeof custom === 'object')
+			styles = { ...custom, ...styles };
 	}
 
 	// Check remote/manual overrides
-	if (MANUAL_OVERRIDES[username]) {
+	if (styles.color === null && MANUAL_OVERRIDES[username]) {
 		const override = MANUAL_OVERRIDES[username];
 		const colorStr = typeof override === 'string' ? override : override.color;
 		if (colorStr) {
-			const hsl = parseColorToHsl(colorStr);
-			if (hsl) return hsl;
+			const parsedColor = parseColor(colorStr, colorFormat);
+			if (parsedColor) styles.color = parsedColor;
+		}
+
+		if(includeStyles && typeof override === 'object')
+			styles = { ...override, ...styles };
+	}
+
+	if(styles.color === null)
+	{
+		// No user-saved, or overrides, Generate from hash
+		const hash = hashString(username);
+		const hash2 = hashString(username + '_sat');
+		const hash3 = hashString(username + '_lit');
+
+		const hsl = {
+			h: hash % 360,
+			s: hash2 % 101,  // 0-100 inclusive
+			l: hash3 % 101   // 0-100 inclusive
+		}
+
+		styles = {
+			...styles,
+			color: parseColor(hsl, colorFormat)
+		};
+	}
+
+	if(includeStyles)
+	{
+		// Apply style variations based on hash (unless already set by override)
+
+		const hashStyles = getHashBasedStyleVariations(username);
+		if (styleConfig.varyWeight && !styles.fontWeight)
+			styles.fontWeight = hashStyles.fontWeight;
+		if (styleConfig.varyItalic && !styles.fontStyle)
+			styles.fontStyle = hashStyles.fontStyle;
+		if (styleConfig.varyCase && !styles.fontVariant)
+			styles.fontVariant = hashStyles.fontVariant;
+
+		if(styleConfig.prependIcon || styleConfig.appendIcon)
+		{
+			const icon = getHashBasedIcon(username);
+			if(styles.appendIcon !== false)
+				styles.appendIcon = icon;
+			if(styles.prependIcon !== false)
+				styles.prependIcon = icon;
 		}
 	}
 
-	// Generate from hash - full range
-	const hash = hashString(username);
-	const hash2 = hashString(username + '_sat');
-	const hash3 = hashString(username + '_lit');
+	return includeStyles ? styles : styles.color;
+}
 
-	return {
-		h: hash % 360,
-		s: hash2 % 101,  // 0-100 inclusive
-		l: hash3 % 101   // 0-100 inclusive
-	};
+
+/**
+ * Get hash-based icon for a username (ignores overrides, for display defaults)
+ * Returns the same icon for both prepend and append by default
+ */
+function getHashBasedIcon(username, config = styleConfig) {
+	if ((!config.prependIcon && !config.appendIcon) || !config.iconSet) return null;
+	const icons = config.iconSet.split(/\s+/).filter(Boolean);
+	if (icons.length === 0) return null;
+	const hash = hashString(username + '_icon');
+	return icons[hash % icons.length];
 }
 
 /**
- * Apply site-wide range mapping to a base color
- * Maps proportionally: input 0-360/0-100 → configured min-max range
+ * Get hash-based style variations for a username
  */
-function applyRangeMapping(hsl, config) {
+function getHashBasedStyleVariations(username) {
 	return {
-		h: mapHueToRange(hsl.h, config.minHue, config.maxHue),
-		s: mapToRange(hsl.s, config.minSaturation, config.maxSaturation),
-		l: mapToRange(hsl.l, config.minLightness, config.maxLightness)
+		fontWeight: (hashString(username + '_fontWeight') % 2 === 0) ? 'normal' : 'bold',
+		fontStyle: (hashString(username + '_fontStyle') % 4 === 0) ? 'italic' : 'normal',
+		fontVariant: (hashString(username + '_fontVariant') % 4 === 1) ? 'small-caps' : 'normal'
 	};
 }
+
 
 /**
  * Get raw styles for editing in color picker
  * Returns the base color values that user can edit
  */
-function getRawStylesForPicker(username) {
-	const base = getBaseColor(username);
+function getRawStylesForPicker(username) 
+{
+	const base = getNickBase(username);
 
 	// Build styles object with base color
 	let styles = { color: `hsl(${base.h}, ${base.s}%, ${base.l}%)` };
@@ -85,114 +175,96 @@ function getRawStylesForPicker(username) {
 	return styles;
 }
 
-function generateStyles(username) {
-	let styles = {};
+/**
+ * Apply color color to a base color
+ * Returns the mapped color in the requested format
+ */
+function getMappedNickColor(username, includeStyles = false, colorFormat = 'hsl')
+{
+	const base = getNickBase(username, includeStyles, colorFormat);
 	const effectiveConfig = getEffectiveColorConfig();
-	const threshold = effectiveConfig.contrastThreshold || 0;
+	let mapped = null;
 
-	// Get per-user invert setting (true, false, or undefined for auto)
-	const userInvertSetting = customNickColors[username]?.invert;
-
-	// Check for override with backgroundColor (special handling)
-	const override = MANUAL_OVERRIDES[username];
-	if (override && override.backgroundColor) {
-		// Apply full range mapping to both fg and bg colors
-		const mappedBg = applyRangeMappingToHex(override.backgroundColor, effectiveConfig);
-		const mappedFg = override.color ? applyRangeMappingToHex(override.color, effectiveConfig) : null;
-		styles.backgroundColor = mappedBg ? mappedBg.color : override.backgroundColor;
-		styles.color = mappedFg ? mappedFg.color : (override.color || 'var(--color-fg, #fff)');
-		styles.padding = '0 0.25em';
-
-		// Copy non-color properties
-		const overrideCopy = { ...override };
-		delete overrideCopy.color;
-		delete overrideCopy.backgroundColor;
-		styles = { ...styles, ...overrideCopy };
-
-		return styles;
-	}
-
-	// Get base color and apply site-wide range mapping
-	const baseColor = getBaseColor(username);
-	const mappedColor = applyRangeMapping(baseColor, effectiveConfig);
-	const colorRgb = hslToRgb(mappedColor.h, mappedColor.s, mappedColor.l);
-
-	// Set the display color
-	styles.color = `hsl(${mappedColor.h}, ${mappedColor.s}%, ${mappedColor.l}%)`;
-
-	// Copy non-color properties from custom save or override
-	if (customNickColors[username] && typeof customNickColors[username] === 'object') {
-		const custom = { ...customNickColors[username] };
-		delete custom.color;
-		delete custom.invert;
-		styles = { ...styles, ...custom };
-	} else if (override && typeof override === 'object') {
-		const overrideCopy = { ...override };
-		delete overrideCopy.color;
-		styles = { ...styles, ...overrideCopy };
-	}
-
-	// Handle inversion based on per-user setting or auto contrast
-	let shouldInvert = false;
-	if (userInvertSetting === true) {
-		// User explicitly enabled inversion
-		shouldInvert = true;
-	} else if (userInvertSetting === false) {
-		// User explicitly disabled inversion
-		shouldInvert = false;
-	} else {
-		// Auto: check WCAG contrast ratio threshold
-		if (threshold > 0 && !styles.backgroundColor) {
-			const bgRgb = getBackgroundRgb();
-			const contrastRatio = getContrastRatio(colorRgb, bgRgb);
-			shouldInvert = contrastRatio < threshold;
+	if(includeStyles === true)
+	{
+		mapped = { ...base };
+		for(const key in base)
+		{
+			if(key.startsWith('color'))
+			{
+				mapped[toCamelCase('base-' + key)] = base[key];
+				mapped[key] = applyRangeMappingToColor(base[key], effectiveConfig, colorFormat);
+			}
 		}
 	}
-
-	if (shouldInvert && !styles.backgroundColor) {
-		// Get best text color and potentially adjusted background
-		const inverted = getInvertedColors(colorRgb, styles.color, threshold);
-		styles.backgroundColor = inverted.backgroundColor;
-		styles.color = inverted.textColor;
-		styles.padding = '0 0.25em';
+	else 
+	{
+		mapped = applyRangeMappingToColor(base, effectiveConfig, colorFormat)
 	}
-
-	// Apply style variations based on hash (unless already set by override)
-	const hash4 = hashString(username + '_style');
-	if (styleConfig.varyWeight && !styles.fontWeight) {
-		styles.fontWeight = (hash4 % 2 === 0) ? 'normal' : 'bold';
-	}
-	if (styleConfig.varyItalic && !styles.fontStyle) {
-		styles.fontStyle = (hash4 % 4 === 0) ? 'italic' : 'normal';
-	}
-	if (styleConfig.varyCase && !styles.fontVariant) {
-		styles.fontVariant = (hash4 % 4 === 1) ? 'small-caps' : 'normal';
-	}
-
-	return styles;
+	
+	return mapped;
 }
 
-/**
- * Get hash-based icon for a username (ignores overrides, for display defaults)
- * Returns the same icon for both prepend and append by default
- */
-function getHashBasedIcon(username, config = styleConfig) {
-	if ((!config.prependIcon && !config.appendIcon) || !config.iconSet) return null;
-	const icons = config.iconSet.split(/\s+/).filter(Boolean);
-	if (icons.length === 0) return null;
-	const hash = hashString(username + '_icon');
-	return icons[hash % icons.length];
-}
+function generateStyles(username, invertedContainer = false) 
+{
+	const effectiveConfig = getEffectiveColorConfig();
+	const threshold = effectiveConfig.contrastThreshold || 4.5;
+	const nickStyles = getMappedNickColor(username, true);
+	const presetTheme = siteThemeName ? getPresetTheme(siteThemeName) : null;
 
-/**
- * Get hash-based style variations for a username
- */
-function getHashBasedStyleVariations(username) {
-	const hash = hashString(username + '_style');
-	return {
-		fontWeight: (hash % 2 === 0) ? 'normal' : 'bold',
-		fontStyle: (hash % 4 === 0) ? 'italic' : 'normal',
-		fontVariant: (hash % 4 === 1) ? 'small-caps' : 'normal'
+	let nickColorRGB = parseColor(nickStyles.color, 'rgb');
+	let elementBackgroundColor = invertedContainer ? siteTheme.fg : siteTheme.bg;
+	if(invertedContainer && presetTheme.logic && presetTheme.logic.invertedContainerBg) {
+		let invertedContainerBg = presetTheme.logic.invertedContainerBg;
+		if(siteTheme[invertedContainerBg])
+			invertedContainerBg = siteTheme[invertedContainerBg];
+
+		elementBackgroundColor = invertedContainerBg;
+	}
+
+	let nickBgColorRGB = parseColor(nickStyles.backgroundColor ?? elementBackgroundColor, 'rgb');
+
+	// Handle inversion based on per-user setting or auto contrast
+	let contrastRatio = getContrastRatio(nickColorRGB, nickBgColorRGB);
+	let shouldInvert = false;
+
+	// User explicitly set inversion
+	if (nickStyles.invert === true || nickStyles.invert === false)
+		shouldInvert = nickStyles.invert;
+	else if(threshold > 0)
+		shouldInvert = contrastRatio < threshold;
+
+	const nickFg = parseColor(nickStyles.color, 'hsl-string');
+	const nickBg = nickStyles.backgroundColor ? parseColor(nickStyles.backgroundColor, 'hsl-string') : null;
+
+	const styles = makeStylesObject(nickStyles);
+	styles.padding = '0 0.25rem';
+	styles.color = nickFg;
+
+	// if we should invert, swap fg and bg
+	if(shouldInvert)
+	{
+		let invertBg = nickFg;
+		let invertFg = nickBg? nickBg : pickBestContrastingColor(nickFg, 'hsl-string', invertedContainer ? true : false);
+
+		const adjustedColors = adjustContrastToThreshold(invertBg, invertFg, threshold, 'hsl-string');
+		styles.color = adjustedColors.colorAdjust;
+		styles.backgroundColor = adjustedColors.colorCompare;
+
+		contrastRatio = getContrastRatio(adjustedColors.colorCompare, adjustedColors.colorAdjust);
+	}
+	else 
+	{
+		const adjustedColors = adjustContrastToThreshold(nickBgColorRGB, nickFg, threshold, 'hsl-string');
+		styles.color = adjustedColors.colorAdjust;
+
+		contrastRatio = getContrastRatio(adjustedColors.colorCompare, adjustedColors.colorAdjust);
+	}
+
+	return { 
+		styles, 
+		nickConfig: nickStyles,
+		contrastRatio: contrastRatio.toFixed(2),
 	};
 }
 
@@ -232,107 +304,56 @@ function getIconsForUsername(username) {
 	};
 }
 
-function applyStyles(element, username) {
-	const styles = generateStyles(username);
-	const effectiveConfig = getEffectiveColorConfig();
-	const threshold = effectiveConfig.contrastThreshold || 0;
-
+function applyStyles(element, username, matchType = 'nick', invertedContainer = null, mergeStyles = {}) 
+{
 	// Check if element is in an inverted container
-	const isInverted = INVERTED_CONTAINERS.length > 0 &&
-		INVERTED_CONTAINERS.some(sel => element.closest(sel));
+	const isInverted = invertedContainer !== null ? invertedContainer : (
+		INVERTED_CONTAINERS.length > 0 &&
+		INVERTED_CONTAINERS.some(sel => element.closest(sel))
+	);
 
-	if (isInverted) {
-		// Inverted container has theme.fg as background, theme.bg as text
-		// We need to recalculate contrast against theme.fg (the container's bg)
-		const containerBgRgb = getForegroundRgb(); // theme.fg is the container's bg
-		const pageBgRgb = getBackgroundRgb();
+	let { styles, nickConfig, contrastRatio } = generateStyles(username, isInverted);
 
-		if (styles.backgroundColor) {
-			// Already has a background - check contrast against container bg
-			const bgHsl = parseColorToHsl(styles.backgroundColor);
-			if (bgHsl) {
-				const bgRgb = hslToRgb(bgHsl.h, bgHsl.s, bgHsl.l);
-				const contrastWithContainer = getContrastRatio(bgRgb, containerBgRgb);
+	styles = { ...styles, ...mergeStyles };
 
-				if (threshold > 0 && contrastWithContainer < threshold) {
-					// Nick bg has poor contrast with container bg - adjust it
-					const adjusted = adjustBgForContrast(bgRgb, containerBgRgb, threshold);
-					if (adjusted) {
-						styles.backgroundColor = adjusted;
-						// Recalculate text color for new background
-						const adjustedHsl = parseColorToHsl(adjusted);
-						if (adjustedHsl) {
-							const adjustedRgb = hslToRgb(adjustedHsl.h, adjustedHsl.s, adjustedHsl.l);
-							const fgContrast = getContrastRatio(containerBgRgb, adjustedRgb);
-							const bgContrast = getContrastRatio(pageBgRgb, adjustedRgb);
-							styles.color = bgContrast > fgContrast ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
-						}
-					}
-				} else {
-					// Good contrast with container - pick best text color
-					const fgContrast = getContrastRatio(containerBgRgb, bgRgb);
-					const bgContrast = getContrastRatio(pageBgRgb, bgRgb);
-					styles.color = bgContrast > fgContrast ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
-				}
-			}
-		} else if (styles.color) {
-			// Normal color - check if it needs inversion for the inverted container
-			const colorHsl = parseColorToHsl(styles.color);
-			if (colorHsl) {
-				const colorRgb = hslToRgb(colorHsl.h, colorHsl.s, colorHsl.l);
-				const contrastRatio = getContrastRatio(colorRgb, containerBgRgb);
-
-				if (threshold > 0 && contrastRatio < threshold) {
-					// Need to invert for the container
-					// Use the nick color as background, but adjust if needed for container contrast
-					let bgRgb = colorRgb;
-					let bgColor = styles.color;
-					const bgContrastWithContainer = getContrastRatio(colorRgb, containerBgRgb);
-
-					if (bgContrastWithContainer < threshold) {
-						// Nick color also has poor contrast as a bg - adjust it
-						const adjusted = adjustBgForContrast(colorRgb, containerBgRgb, threshold);
-						if (adjusted) {
-							bgColor = adjusted;
-							const adjustedHsl = parseColorToHsl(adjusted);
-							if (adjustedHsl) {
-								bgRgb = hslToRgb(adjustedHsl.h, adjustedHsl.s, adjustedHsl.l);
-							}
-						}
-					}
-
-					// Pick text color based on contrast with the (possibly adjusted) background
-					const fgContrast = getContrastRatio(containerBgRgb, bgRgb);
-					const bgContrast = getContrastRatio(pageBgRgb, bgRgb);
-					const textColor = bgContrast > fgContrast ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
-
-					styles.backgroundColor = bgColor;
-					styles.color = textColor;
-					styles.padding = '0 0.25rem';
-				}
-			}
+	if (styles.data) {
+		for (const key in styles.data) {
+			element.dataset[key] = styles.data[key];
 		}
+		delete styles.data;
 	}
 
 	// Apply all styles to the element
-	Object.assign(element.style, styles);
-	element.dataset.nickColored = 'true';
+	for(const key in styles)
+	{
+		const styleKey = toKebabCase(key);
+		element.style.setProperty(styleKey, styles[key], 'important');
+	}
+
+	element.dataset[`${matchType}Colored`] = 'true';
 	element.dataset.username = username;
+	element.dataset.contrastRatio = contrastRatio;
+
+	const prependIcon = nickConfig.prependIcon;
+	const appendIcon = nickConfig.appendIcon;
 
 	// Prepend/append icon if enabled
-	const icons = getIconsForUsername(username);
-	if (icons.prepend || icons.append) {
+	if (prependIcon || appendIcon) 
+	{
 		if (!element.dataset.iconApplied) {
 			// Store original text before first icon application
 			element.dataset.originalText = element.textContent;
 			element.dataset.iconApplied = 'true';
 		}
+
 		const originalText = element.dataset.originalText || element.textContent;
 		let newText = originalText;
-		if (icons.prepend) newText = icons.prepend + ' ' + newText;
-		if (icons.append) newText = newText + ' ' + icons.append;
+		if (prependIcon) newText = prependIcon + ' ' + newText;
+		if (appendIcon) newText = newText + ' ' + appendIcon;
 		element.textContent = newText;
-	} else if (element.dataset.iconApplied) {
+	} 
+	else if (element.dataset.iconApplied) 
+	{
 		// Icons were removed - restore original text
 		if (element.dataset.originalText) {
 			element.textContent = element.dataset.originalText;
@@ -340,4 +361,6 @@ function applyStyles(element, username) {
 		delete element.dataset.iconApplied;
 		delete element.dataset.originalText;
 	}
+
+	return element;
 }

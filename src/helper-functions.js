@@ -105,9 +105,92 @@ function hslToRgb(h, s, l) {
 	};
 }
 
+// Figure out what format a color is in
+function getColorFormat(color){
+	if(typeof color === 'string') {
+		if(color.match(/hsl\(([\d.]+),\s*([\d.]+)%?,\s*([\d.]+)%?\)/))
+			return 'hsl-string';
+		else if(color.match(/rgb\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\)/))
+			return 'rgb-string';
+		else if(color.match(/^#([a-f\d]{6}|[a-f\d]{3})$/i))
+			return 'hex-string';
+	} else if(typeof color === 'object') {
+		if (color.h !== undefined && color.s !== undefined && color.l !== undefined)
+			return 'hsl-object';
+		else if (color.r !== undefined && color.g !== undefined && color.b !== undefined)
+			return 'rgb-object';
+	}
+	return null;
+}
+
+// Parse any color string or object to color object (HSL by default)
+function parseColor(color, colorFormat = 'hsl') 
+{
+	if (!color) return null;
+
+	let hslMatch, rgbMatch, hexMatch;
+	if(typeof color === 'string') {
+		hslMatch = color.match(/hsl\(([\d.]+),\s*([\d.]+)%?,\s*([\d.]+)%?\)/);
+		rgbMatch = color.match(/rgb\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\)/);
+		hexMatch = color.match(/^#([a-f\d]{6}|[a-f\d]{3})$/i);
+	} else if(typeof color === 'object') {
+		if (color.h !== undefined && color.s !== undefined && color.l !== undefined)
+			hslMatch = [null, color.h, color.s, color.l];
+		else if (color.r !== undefined && color.g !== undefined && color.b !== undefined)
+			rgbMatch = [null, color.r, color.g, color.b];
+	}
+
+	const formatType = colorFormat.match('-string') ? 'string' : 'object';
+	colorFormat = colorFormat.replace(/-string|-object$/, '');
+
+	if(colorFormat === 'hsl') {
+		if (hslMatch)
+			return formatType === 'string' ? 
+			`hsl(${+hslMatch[1].toFixed(1)}, ${+hslMatch[2].toFixed(1)}%, ${+hslMatch[3].toFixed(1)}%)` : 
+			{ h: +hslMatch[1], s: +hslMatch[2], l: +hslMatch[3] };
+		else if (rgbMatch){
+			const hsl = rgbToHsl(+rgbMatch[1], +rgbMatch[2], +rgbMatch[3]);
+			return formatType === 'string' ?
+				`hsl(${hsl.h.toFixed(1)}, ${hsl.s.toFixed(1)}%, ${hsl.l.toFixed(1)}%)` :
+				{ h: hsl.h, s: hsl.s, l: hsl.l };
+		}
+		else if (hexMatch)
+			return hexToHsl(color);
+	} else if(colorFormat === 'rgb') {
+		if (rgbMatch)
+			return formatType === 'string' ? 
+				`rgb(${+rgbMatch[1].toFixed(1)}, ${+rgbMatch[2].toFixed(1)}, ${+rgbMatch[3].toFixed(1)})` : 
+				{ r: +rgbMatch[1], g: +rgbMatch[2], b: +rgbMatch[3] };
+		else if (hslMatch) {
+			const rgb = hslToRgb(+hslMatch[1], +hslMatch[2], +hslMatch[3]);
+			return formatType === 'string' ?
+				`rgb(${rgb.r.toFixed(1)}, ${rgb.g.toFixed(1)}, ${rgb.b.toFixed(1)})` :
+				{ r: rgb.r, g: rgb.g, b: rgb.b };
+		}
+		else if (hexMatch)
+			return hexToRgb(color);
+	} else if(colorFormat === 'hex') {
+		if (hexMatch)
+			return color;
+		else if (hslMatch)
+			return rgbToHex(hslToRgb(+hslMatch[1], +hslMatch[2], +hslMatch[3]));
+		else if (rgbMatch)
+			return rgbToHex({ r: +rgbMatch[1], g: +rgbMatch[2], b: +rgbMatch[3] });
+	}
+
+	return null;
+}
+
 // Calculate relative luminance per WCAG 2.1
 // https://www.w3.org/WAI/GL/wiki/Relative_luminance
-function getRelativeLuminance(r, g, b) {
+// black = 0, white = 1
+function getRelativeLuminance(color) {
+
+	const rgb = parseColor(color, 'rgb');
+
+	if (!rgb) return 0;
+	const { r, g, b } = rgb;
+
 	// Convert 0-255 to 0-1
 	const rsRGB = r / 255;
 	const gsRGB = g / 255;
@@ -125,9 +208,9 @@ function getRelativeLuminance(r, g, b) {
 // Calculate WCAG contrast ratio between two colors
 // Returns a value from 1 (no contrast) to 21 (max contrast)
 // https://www.w3.org/WAI/GL/wiki/Contrast_ratio
-function getContrastRatio(rgb1, rgb2) {
-	const L1 = getRelativeLuminance(rgb1.r, rgb1.g, rgb1.b);
-	const L2 = getRelativeLuminance(rgb2.r, rgb2.g, rgb2.b);
+function getContrastRatio(color1, color2) {
+	const L1 = getRelativeLuminance(color1);
+	const L2 = getRelativeLuminance(color2);
 
 	const lighter = Math.max(L1, L2);
 	const darker = Math.min(L1, L2);
@@ -135,9 +218,194 @@ function getContrastRatio(rgb1, rgb2) {
 	return (lighter + 0.05) / (darker + 0.05);
 }
 
+// Helper to get theme colors from preset by name
+function getPresetTheme(themeName) {
+	if (!themeName) return null;
+	// Try exact match first, then case-insensitive
+	if (PRESET_THEMES[themeName]) return PRESET_THEMES[themeName];
+	const lowerName = themeName.toLowerCase();
+	for (const [name, preset] of Object.entries(PRESET_THEMES)) {
+		if (name.toLowerCase() === lowerName) return preset;
+	}
+	return null;
+}
+
+// Get theme variables from 1. custom_theme 2. preset_theme 3. default
+// if colorFormat is specified, return colors in that format
+function getThemeVariables(colorFormat = null)
+{
+	const root = document.documentElement;
+	const style = getComputedStyle(root);
+
+	// Get preset theme from data-theme attribute
+	siteThemeName = root.dataset.theme || document.body?.dataset?.theme;
+	const presetTheme = siteThemeName ? getPresetTheme(siteThemeName) : null;
+
+	// Map custom_theme keys to our keys (custom_theme uses different property names)
+	const customTheme = siteCustomTheme ? {
+		bg: siteCustomTheme.bg,
+		fg: siteCustomTheme.fg,
+		fgDim: siteCustomTheme.fgDim || siteCustomTheme.dim,
+		border: siteCustomTheme.border,
+		codeBg: siteCustomTheme.codeBg || siteCustomTheme.code_bg
+	} : null;
+
+	// Default fallbacks (used if no theme or theme missing property)
+	const defaults = {
+		bg: '#0a0a0a',
+		fg: '#e0e0e0',
+		fgDim: '#888888',
+		border: '#333333',
+		codeBg: '#222222'
+	};
+
+	// Helper to check if a color value is valid (not transparent, not empty)
+	function isValidColor(value) {
+		if (!value || value === 'transparent' || value === 'none') {
+			return false;
+		}
+		// Accept hex, rgb(), hsl(), rgba(), hsla()
+		if (hexToRgb(value)) return true;
+		if (value.startsWith('rgb') || value.startsWith('hsl')) return true;
+		return false;
+	}
+
+	// Get safe color with fallback chain: CSS var > custom_theme > preset > default
+	function getSafeColor(varName, themeKey) {
+		// 1. Try CSS variable
+		const cssValue = style.getPropertyValue(varName).trim();
+		if (isValidColor(cssValue)) {
+			return cssValue;
+		}
+
+		// 2. Try custom_theme (user's custom colors from localStorage)
+		if (customTheme && isValidColor(customTheme[themeKey])) {
+			return customTheme[themeKey];
+		}
+
+		// 3. Try preset theme
+		if (presetTheme && isValidColor(presetTheme[themeKey])) {
+			return presetTheme[themeKey];
+		}
+
+		// 4. Fall back to defaults
+		return defaults[themeKey];
+	}
+
+	const colors = {
+		bg: getSafeColor('--color-bg', 'bg'),
+		fg: getSafeColor('--color-fg', 'fg'),
+		fgDim: getSafeColor('--color-fg-dim', 'fgDim'),
+		border: getSafeColor('--color-border', 'border'),
+		codeBg: getSafeColor('--color-code-bg', 'codeBg'),
+
+		error: '#ff6b6b',
+		warn: '#ffd93d',
+		success: '#6bcb77',
+		info: '#4d96ff',
+		errorBg: '#1a0d0d',
+		warnBg: '#1a250d',
+		successBg: '#152a15',
+		infoBg: '#15152a'
+	}
+	
+	// Generate semantic colors based on fg color's saturation/lightness
+	// Shift hue to standard values: error=0, warn=45, success=120, info=210
+	const fgHsl = hexToHsl(colors.fg) || parseColor(colors.fg, 'hsl');
+	const bgHsl = hexToHsl(colors.bg) || parseColor(colors.bg, 'hsl');
+
+	// Helper to adjust lightness until we get good contrast against bg
+	function getContrastSafeColor(hue, sat, lit, bgRgb, minContrast = 4.5) {
+		// Try the initial lightness
+		let testLit = lit;
+		let rgb = hslToRgb(hue, sat, testLit);
+		let contrast = getContrastRatio(rgb, bgRgb);
+
+		// If contrast is good, return as-is
+		if (contrast >= minContrast) {
+			return `hsl(${hue}, ${sat}%, ${testLit}%)`;
+		}
+
+		// Determine if we need to go lighter or darker based on bg luminance
+		const bgLum = getRelativeLuminance(bgRgb);
+		const direction = bgLum > 0.5 ? -5 : 5; // Dark bg = go lighter, light bg = go darker
+
+		// Adjust lightness until contrast is good (max 15 iterations)
+		for (let i = 0; i < 15; i++) {
+			testLit = Math.max(5, Math.min(95, testLit + direction));
+			rgb = hslToRgb(hue, sat, testLit);
+			contrast = getContrastRatio(rgb, bgRgb);
+			if (contrast >= minContrast) {
+				break;
+			}
+		}
+
+		return `hsl(${hue}, ${sat}%, ${testLit}%)`;
+	}
+
+	if (fgHsl && bgHsl) {
+		// Use fg's saturation and lightness as starting point
+		let sat = Math.max(fgHsl.s, 50);
+		let lit = fgHsl.l;
+
+		// If fg is too dark or too light, start from a middle ground
+		if (lit < 20 || lit > 80) {
+			lit = 50;
+			sat = Math.max(sat, 70);
+		}
+
+		// Get bg as RGB for contrast checking
+		const bgRgb = hslToRgb(bgHsl.h, bgHsl.s, bgHsl.l);
+
+		colors.error = getContrastSafeColor(0, sat, lit, bgRgb);
+		colors.warn = getContrastSafeColor(45, sat, lit, bgRgb);
+		colors.success = getContrastSafeColor(120, sat, lit, bgRgb);
+		colors.info = getContrastSafeColor(210, sat, lit, bgRgb);
+	}
+
+	if (bgHsl) {
+		// Use bg's saturation and lightness for background variants
+		let sat = Math.max(bgHsl.s, 20);
+		let lit = bgHsl.l;
+
+		// If bg is pure black, add a subtle tint
+		if (lit < 5) {
+			lit = 10;
+			sat = Math.max(sat, 30);
+		}
+		// If bg is pure white, darken slightly for visibility
+		else if (lit > 95) {
+			lit = 90;
+			sat = Math.max(sat, 30);
+		}
+
+		colors.errorBg = `hsl(0, ${sat}%, ${lit}%)`;
+		colors.warnBg = `hsl(45, ${sat}%, ${lit}%)`;
+		colors.successBg = `hsl(120, ${sat}%, ${lit}%)`;
+		colors.infoBg = `hsl(210, ${sat}%, ${lit}%)`;
+	}
+
+	if(colorFormat)
+	{
+		for(const key in colors)
+		{
+			const color = colors[key];
+			const parsed = parseColor(color, colorFormat);
+			if(parsed) colors[key] = parsed;
+		}
+	}
+	
+	return colors;
+}
+
 // Convert camelCase to kebab-case
 function toKebabCase(str) {
 	return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+}
+
+// Convert kebab-case to camelCase
+function toCamelCase(str) {
+	return str.replace(/-([a-z])/g, (match, p1) => p1.toUpperCase());
 }
 
 // Convert style object to CSS string
@@ -145,21 +413,6 @@ function stylesToCssString(styles, separator = '; ') {
 	return Object.entries(styles)
 		.map(([k, v]) => `${toKebabCase(k)}: ${v}`)
 		.join(separator);
-}
-
-// Parse any color string to HSL object
-function parseColorToHsl(color) {
-	if (!color) return null;
-	// Try HSL format (handles both integers and decimals)
-	const hslMatch = color.match(/hsl\(([\d.]+),\s*([\d.]+)%?,\s*([\d.]+)%?\)/);
-	if (hslMatch) {
-		return { h: +hslMatch[1], s: +hslMatch[2], l: +hslMatch[3] };
-	}
-	// Try hex format
-	if (color.startsWith('#')) {
-		return hexToHsl(color);
-	}
-	return null;
 }
 
 // Map a hue value (0-360) to the effective range
@@ -194,7 +447,7 @@ function mapToRange(value, min, max) {
 // Map a color to the effective config range
 // Uses proportional mapping: 0-360/0-100 input maps to the configured range
 function mapColorToRange(color, effectiveConfig) {
-	const hsl = parseColorToHsl(color);
+	const hsl = parseColor(color, 'hsl');
 	if (!hsl) return color; // Can't parse, return as-is
 
 	const mappedHue = mapHueToRange(hsl.h, effectiveConfig.minHue, effectiveConfig.maxHue);
@@ -246,7 +499,7 @@ function adjustBgForContrast(bgRgb, textRgb, threshold = 4.5) {
 	}
 
 	const bgHsl = rgbToHsl(bgRgb.r, bgRgb.g, bgRgb.b);
-	const textLuminance = getRelativeLuminance(textRgb.r, textRgb.g, textRgb.b);
+	const textLuminance = getRelativeLuminance(textRgb);
 
 	// Determine direction: darken if text is light, lighten if text is dark
 	const step = textLuminance > 0.5 ? -5 : 5;
@@ -268,87 +521,125 @@ function adjustBgForContrast(bgRgb, textRgb, threshold = 4.5) {
 	return `hsl(${bgHsl.h.toFixed(0)}, ${bgHsl.s.toFixed(0)}%, ${newL.toFixed(0)}%)`;
 }
 
-// Pick best text color (fg or bg) for inverted nick and adjust bg if needed
-function getInvertedColors(invertedBgRgb, invertedBgColor, threshold) {
-	const fgRgb = getForegroundRgb();
-	const bgRgb = getBackgroundRgb();
-	const fgContrast = getContrastRatio(fgRgb, invertedBgRgb);
-	const bgContrast = getContrastRatio(bgRgb, invertedBgRgb);
+function pickBestContrastingColor(color, colorFormat = 'hsl', invertedContainer = false)
+{
+	let bgColor = siteTheme.bg;
+	let fgColor = siteTheme.fg;
 
-	const useThemeBg = bgContrast > fgContrast;
-	const textColor = useThemeBg ? 'var(--color-bg, #000)' : 'var(--color-fg, #fff)';
-	const textRgb = useThemeBg ? bgRgb : fgRgb;
-	const bestContrast = Math.max(fgContrast, bgContrast);
+	const presetTheme = siteThemeName ? getPresetTheme(siteThemeName) : null;
 
-	// If contrast is still too low, adjust the background
-	if (threshold > 0 && bestContrast < threshold) {
-		const adjustedBg = adjustBgForContrast(invertedBgRgb, textRgb, threshold);
-		if (adjustedBg) {
-			return { textColor, backgroundColor: adjustedBg, adjusted: true };
-		}
+	//check for background logic overrides, see: poetry
+	if(invertedContainer && presetTheme.logic && presetTheme.logic.invertedContainerBg) {
+		let invertedContainerBg = presetTheme.logic.invertedContainerBg;
+		if(siteTheme[invertedContainerBg])
+			invertedContainerBg = siteTheme[invertedContainerBg];
+
+		bgColor = invertedContainerBg;
 	}
 
-	return { textColor, backgroundColor: invertedBgColor, adjusted: false };
+	if(invertedContainer && presetTheme.logic && presetTheme.logic.invertedContainerFg) {
+		let invertedContainerFg = presetTheme.logic.invertedContainerFg;
+		if(siteTheme[invertedContainerFg])
+			invertedContainerFg = siteTheme[invertedContainerFg];
+
+		fgColor = invertedContainerFg;
+	}
+
+	let bgContrast = getContrastRatio(bgColor, color);
+	let fgContrast = getContrastRatio(fgColor, color);
+
+	const useBgColor = bgContrast > fgContrast;
+	const contrastColor = useBgColor ? parseColor(bgColor, colorFormat) : parseColor(fgColor, colorFormat);
+
+	return contrastColor;
 }
 
-// Apply only hue range mapping to a hex color (preserve saturation/lightness)
-function applyHueRangeMappingToHex(hex, config) {
-	const rgb = hexToRgb(hex);
-	if (!rgb) return null;
-	const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-	const mappedHue = mapHueToRange(hsl.h, config.minHue, config.maxHue);
-	return {
-		color: `hsl(${mappedHue.toFixed(1)}, ${hsl.s.toFixed(1)}%, ${hsl.l.toFixed(1)}%)`,
-		rgb: hslToRgb(mappedHue, hsl.s, hsl.l)
-	};
+function adjustContrastToThreshold(colorCompare, colorAdjust, threshold = 4.5, colorFormat = 'hsl')
+{
+	let contrast = getContrastRatio(colorCompare, colorAdjust);
+	const colors = { adjusted: false };
+
+	const hslCompare = parseColor(colorCompare, 'hsl');
+	const hslAdjust = parseColor(colorAdjust, 'hsl');
+	let loopCount = 0;
+	
+	while(contrast < threshold && loopCount < 20)
+	{
+		const luminanceCompare = getRelativeLuminance(hslCompare);
+		const luminanceAdjust = getRelativeLuminance(hslAdjust);
+
+		// if the adjust color is already black or white, adjust the compare color
+		if(hslAdjust.l === 0 || hslAdjust.l === 100)
+		{
+			// if compare color is lighter than adjust color, we need to lighten the compare color
+			if(luminanceCompare > luminanceAdjust)
+				hslCompare.l += 5;
+			else
+				hslCompare.l -= 5;
+		}
+		else 
+		{
+			// if adjust color is lighter than compare color, we need to lighten the adjust color
+			if(luminanceAdjust > luminanceCompare)
+				hslAdjust.l += 5;
+			else
+				hslAdjust.l -= 5;
+		}
+
+		contrast = getContrastRatio(hslCompare, hslAdjust);
+		loopCount++;
+
+		colors.adjusted = true;
+	}
+
+	colors.colorAdjust = parseColor(hslAdjust, colorFormat);
+	colors.colorCompare = parseColor(hslCompare, colorFormat);
+	colors.contrast = contrast;
+	colors.loopCount = loopCount;
+
+	return colors;
 }
 
-// Apply full range mapping to a hex color
-function applyRangeMappingToHex(hex, config) {
-	const rgb = hexToRgb(hex);
-	if (!rgb) return null;
-	const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-	const mappedHue = mapHueToRange(hsl.h, config.minHue, config.maxHue);
-	const mappedSat = mapToRange(hsl.s, config.minSaturation, config.maxSaturation);
-	const mappedLit = mapToRange(hsl.l, config.minLightness, config.maxLightness);
-	return {
-		color: `hsl(${mappedHue.toFixed(1)}, ${mappedSat.toFixed(1)}%, ${mappedLit.toFixed(1)}%)`,
-		rgb: hslToRgb(mappedHue, mappedSat, mappedLit)
-	};
-}
+// Apply range mapping to a color based on config
+function applyRangeMappingToColor(color, config, colorFormat = 'hsl', mapHue = true, mapSat = true, mapLit = true)
+{
+	if(!color) return null;
 
-function saveSiteThemeConfig() {
-	GM_setValue('siteThemeConfig', JSON.stringify(siteThemeConfig));
+	const hsl = parseColor(color, 'hsl');
+	if(!hsl) return null;
+
+	const h = mapHue ? mapHueToRange(hsl.h, config.minHue, config.maxHue) : hsl.h;
+	const s = mapSat ? mapToRange(hsl.s, config.minSaturation, config.maxSaturation) : hsl.s;
+	const l = mapLit ? mapToRange(hsl.l, config.minLightness, config.maxLightness) : hsl.l;
+
+	return parseColor({ h, s, l }, colorFormat);
 }
 
 // Function to get effective color config (applies site theme overrides)
 function getEffectiveColorConfig() {
 	const config = { ...colorConfig };
 
-	if (siteThemeHsl) {
+	if (siteThemeFgHSL) {
 		if (siteThemeConfig.useHueRange) {
-			config.minHue = (siteThemeHsl.h - siteThemeConfig.hueSpread + 360) % 360;
-			config.maxHue = (siteThemeHsl.h + siteThemeConfig.hueSpread) % 360;
+			config.minHue = (siteThemeFgHSL.h - siteThemeConfig.hueSpread + 360) % 360;
+			config.maxHue = (siteThemeFgHSL.h + siteThemeConfig.hueSpread) % 360;
 		}
 		if (siteThemeConfig.useSaturation) {
 			const spread = siteThemeConfig.saturationSpread || 0;
-			config.minSaturation = Math.max(0, siteThemeHsl.s - spread);
-			config.maxSaturation = Math.min(100, siteThemeHsl.s + spread);
+			config.minSaturation = Math.max(0, siteThemeFgHSL.s - spread);
+			config.maxSaturation = Math.min(100, siteThemeFgHSL.s + spread);
 		}
 		if (siteThemeConfig.useLightness) {
 			const spread = siteThemeConfig.lightnessSpread || 0;
-			config.minLightness = Math.max(0, siteThemeHsl.l - spread);
-			config.maxLightness = Math.min(100, siteThemeHsl.l + spread);
+			config.minLightness = Math.max(0, siteThemeFgHSL.l - spread);
+			config.maxLightness = Math.min(100, siteThemeFgHSL.l + spread);
 		}
 	}
 
 	return config;
 }
 
-function saveColorConfig() {
-	GM_setValue('colorConfig', JSON.stringify(colorConfig));
-}
-
+// Hash a string to a number (for consistent color generation)
 function hashString(str) {
 	let hash = 0;
 	const normalized = str.toLowerCase().trim();
@@ -357,4 +648,50 @@ function hashString(str) {
 		hash = hash & hash; // Convert to 32-bit integer
 	}
 	return Math.abs(hash);
+}
+
+// Initialize our safe CSS variables that handle transparent values
+// Sets --nc-* variables on :root with safe fallbacks from current theme
+// Priority: CSS var (if valid) > custom_theme (siteTheme) > PRESET_THEMES > defaults
+function initCssVariables() {
+	
+	const colors = getThemeVariables();
+	const root = document.documentElement;
+
+	root.style.setProperty('--nc-bg', colors.bg);
+	root.style.setProperty('--nc-fg', colors.fg);
+	root.style.setProperty('--nc-fg-dim', colors.fgDim);
+	root.style.setProperty('--nc-border', colors.border);
+	root.style.setProperty('--nc-code-bg', colors.codeBg);
+	root.style.setProperty('--nc-error', colors.error);
+	root.style.setProperty('--nc-warn', colors.warn);
+	root.style.setProperty('--nc-success', colors.success);
+	root.style.setProperty('--nc-info', colors.info);
+	root.style.setProperty('--nc-error-bg', colors.errorBg);
+	root.style.setProperty('--nc-warn-bg', colors.warnBg);
+	root.style.setProperty('--nc-success-bg', colors.successBg);
+	root.style.setProperty('--nc-info-bg', colors.infoBg);
+}
+
+function refreshAllColors() {
+	document.querySelectorAll('[data-nick-colored]').forEach(el => {
+		// Restore original text if we have it stored
+		if (el.dataset.originalText) {
+			el.textContent = el.dataset.originalText;
+		}
+		// Clear all our data attributes
+		delete el.dataset.nickColored;
+		delete el.dataset.iconApplied;
+		delete el.dataset.originalText;
+		delete el.dataset.username;
+		el.style.cssText = ''; // Clear applied styles
+	});
+	// Remove mention spans and restore original text
+	document.querySelectorAll('[data-mention-colored]').forEach(el => {
+		// Reconstruct original mention from stored username (avoids including icon)
+		const username = el.dataset.username;
+		const originalText = username ? `@${username}` : el.textContent;
+		el.replaceWith(document.createTextNode(originalText));
+	});
+	colorizeAll();
 }

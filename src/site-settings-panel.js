@@ -11,7 +11,7 @@
 			content: `
 				${createDebugPre({
 					'Site Theme': siteTheme ? `fg:${siteTheme.fg} bg:${siteTheme.bg}` : 'not detected',
-					'Site Theme HSL': siteThemeHsl ? `H:${siteThemeHsl.h} S:${siteThemeHsl.s} L:${siteThemeHsl.l}` : 'N/A',
+					'Site Theme HSL': siteThemeFgHSL ? `H:${siteThemeFgHSL.h} S:${siteThemeFgHSL.s} L:${siteThemeFgHSL.l}` : 'N/A',
 					'Effective Config': `H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`,
 					'Contrast Threshold': eff.contrastThreshold,
 					'Custom Colors Saved': Object.keys(customNickColors).length
@@ -23,32 +23,32 @@
 					options: `<option value="">-- Select a preset --</option>${Object.keys(PRESET_THEMES).map(name => `<option value="${name}">${name}</option>`).join('')}`
 				})}
 				<hr />
-				<h4>Hue Range${siteThemeHsl ? '' : ' <span class="nc-text-dim">(no site theme)</span>'}</h4>
+				<h4>Hue Range${siteThemeFgHSL ? '' : ' <span class="nc-text-dim">(no site theme)</span>'}</h4>
 				${createToggleRow({
-					label: `Use site theme foreground hue${siteThemeHsl ? ` <span style="color:hsl(${siteThemeHsl.h}, 100%, 50%)">(${siteThemeHsl.h}°)</span>` : ''}`,
+					label: `Use site theme foreground hue${siteThemeFgHSL ? ` <span style="color:hsl(${siteThemeFgHSL.h}, 100%, 50%)">(${siteThemeFgHSL.h}°)</span>` : ''}`,
 					id: 'settings-site-hue',
 					checked: siteThemeConfig.useHueRange,
-					disabled: !siteThemeHsl
+					disabled: !siteThemeFgHSL
 				})}
 				<div id="hue-spread-container" style="display: ${siteThemeConfig.useHueRange ? 'block' : 'none'}"></div>
 				<div id="hue-slider-container"></div>
 				<hr />
 				<h4>Saturation Range</h4>
 				${createToggleRow({
-					label: `Use site theme foreground saturation${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.s}%)</span>` : ''}`,
+					label: `Use site theme foreground saturation${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeFgHSL.s}%)</span>` : ''}`,
 					id: 'settings-site-saturation',
 					checked: siteThemeConfig.useSaturation,
-					disabled: !siteThemeHsl
+					disabled: !siteThemeFgHSL
 				})}
 				<div id="sat-spread-container" style="display: ${siteThemeConfig.useSaturation ? 'block' : 'none'}"></div>
 				<div id="sat-slider-container"></div>
 				<hr />
 				<h4>Lightness Range</h4>
 				${createToggleRow({
-					label: `Use site theme foreground lightness${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeHsl.l}%)</span>` : ''}`,
+					label: `Use site theme foreground lightness${siteTheme?.fg ? ` <span style="color:${siteTheme.fg}">(${siteThemeFgHSL.l}%)</span>` : ''}`,
 					id: 'settings-site-lightness',
 					checked: siteThemeConfig.useLightness,
-					disabled: !siteThemeHsl
+					disabled: !siteThemeFgHSL
 				})}
 				<div id="lit-spread-container" style="display: ${siteThemeConfig.useLightness ? 'block' : 'none'}"></div>
 				<div id="lit-slider-container"></div>
@@ -208,18 +208,18 @@
 		function getEffective() {
 			const s = getSettings();
 			const eff = { ...s.color };
-			if (siteThemeHsl) {
+			if (siteThemeFgHSL) {
 				if (s.siteTheme.useHueRange) {
-					eff.minHue = (siteThemeHsl.h - s.siteTheme.hueSpread + 360) % 360;
-					eff.maxHue = (siteThemeHsl.h + s.siteTheme.hueSpread) % 360;
+					eff.minHue = (siteThemeFgHSL.h - s.siteTheme.hueSpread + 360) % 360;
+					eff.maxHue = (siteThemeFgHSL.h + s.siteTheme.hueSpread) % 360;
 				}
 				if (s.siteTheme.useSaturation) {
-					eff.minSaturation = Math.max(0, siteThemeHsl.s - s.siteTheme.saturationSpread);
-					eff.maxSaturation = Math.min(100, siteThemeHsl.s + s.siteTheme.saturationSpread);
+					eff.minSaturation = Math.max(0, siteThemeFgHSL.s - s.siteTheme.saturationSpread);
+					eff.maxSaturation = Math.min(100, siteThemeFgHSL.s + s.siteTheme.saturationSpread);
 				}
 				if (s.siteTheme.useLightness) {
-					eff.minLightness = Math.max(0, siteThemeHsl.l - s.siteTheme.lightnessSpread);
-					eff.maxLightness = Math.min(100, siteThemeHsl.l + s.siteTheme.lightnessSpread);
+					eff.minLightness = Math.max(0, siteThemeFgHSL.l - s.siteTheme.lightnessSpread);
+					eff.maxLightness = Math.min(100, siteThemeFgHSL.l + s.siteTheme.lightnessSpread);
 				}
 			}
 			return eff;
@@ -256,67 +256,25 @@
 		function updatePreview() {
 			updateGradients();
 			const eff = getEffective();
-			const bgRgb = getBackgroundRgb();
 
-			// Temporarily apply dialog settings to global config for generateStyles
+			// Temporarily apply dialog settings to global config for applyStyles
+			// Also disable siteThemeConfig since eff already has those adjustments applied
 			const savedColorConfig = { ...colorConfig };
+			const savedSiteThemeConfig = { ...siteThemeConfig };
 			Object.assign(colorConfig, eff);
+			siteThemeConfig.useHueRange = false;
+			siteThemeConfig.useSaturation = false;
+			siteThemeConfig.useLightness = false;
 
 			previewRow.querySelectorAll('.preview-nick').forEach((el, i) => {
 				const username = previewNames[i];
-
-				// Check for overrides first (same logic as generateStyles)
 				const s = getSettings().style;
-				const hashStyles = getHashBasedStyleVariations(username);
-
-				if (customNickColors[username] || MANUAL_OVERRIDES[username]) {
-					const styles = generateStyles(username);
-					el.style.cssText = '';
-					Object.assign(el.style, styles);
-				} else {
-					// Generate from hash using current settings
-					const hash = hashString(username);
-					const hash2 = hashString(username + '_sat');
-					const hash3 = hashString(username + '_lit');
-					let range = eff.maxHue - eff.minHue; if (range <= 0) range += 360;
-					let hue = eff.minHue + (hash % Math.max(1, range)); if (hue >= 360) hue -= 360;
-					const satRange = eff.maxSaturation - eff.minSaturation;
-					const sat = eff.minSaturation + (hash2 % Math.max(1, satRange + 1));
-					const litRange = eff.maxLightness - eff.minLightness;
-					const lit = eff.minLightness + (hash3 % Math.max(1, litRange + 1));
-					const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
-					// Invert colors if WCAG contrast ratio is below threshold
-					const threshold = eff.contrastThreshold || 4.5;
-					const colorRgb = hslToRgb(hue, sat, lit);
-					const contrastRatio = getContrastRatio(colorRgb, bgRgb);
-					if (threshold > 0 && contrastRatio < threshold) {
-						el.style.backgroundColor = color;
-						el.style.color = 'var(--color-fg, #fff)';
-						el.style.padding = '0 0.25em';
-					} else {
-						el.style.color = color;
-						el.style.backgroundColor = '';
-						el.style.padding = '';
-					}
-
-					// Apply style variations based on current toggle states
-					el.style.fontWeight = s.varyWeight ? hashStyles.fontWeight : '';
-					el.style.fontStyle = s.varyItalic ? hashStyles.fontStyle : '';
-					el.style.fontVariant = s.varyCase ? hashStyles.fontVariant : '';
-				}
-
-				// Apply icon using helper
-				const icon = getHashBasedIcon(username, s);
-				let displayText = username;
-				if (icon) {
-					if (s.prependIcon) displayText = icon + ' ' + displayText;
-					if (s.appendIcon) displayText = displayText + ' ' + icon;
-				}
-				el.textContent = displayText;
+				applyStyles(el, username);
 			});
 
-			// Restore original config
+			// Restore original configs
 			Object.assign(colorConfig, savedColorConfig);
+			Object.assign(siteThemeConfig, savedSiteThemeConfig);
 		}
 
 		presetSelect.addEventListener('change', () => {
@@ -363,7 +321,7 @@
 			// Grey out thumbs when disabled
 			const thumbs = container.querySelectorAll('.nc-slider-thumb');
 			thumbs.forEach(thumb => {
-				thumb.style.background = disabled ? 'var(--color-fg-dim, #666)' : '';
+				thumb.style.background = disabled ? 'var(--nc-fg-dim)' : '';
 				thumb.style.cursor = disabled ? 'default' : '';
 			});
 		}
@@ -375,23 +333,23 @@
 
 		// Update sliders to show site theme values when toggled on
 		function updateSlidersForSiteTheme() {
-			if (siteThemeHsl) {
+			if (siteThemeFgHSL) {
 				if (siteHueInput?.checked) {
 					const spread = hueSpreadSlider.getValue();
-					const minHue = (siteThemeHsl.h - spread + 360) % 360;
-					const maxHue = (siteThemeHsl.h + spread) % 360;
+					const minHue = (siteThemeFgHSL.h - spread + 360) % 360;
+					const maxHue = (siteThemeFgHSL.h + spread) % 360;
 					hueSlider.setValues([minHue, maxHue]);
 				}
 				if (siteSaturationInput?.checked) {
 					const spread = satSpreadSlider.getValue();
-					const minSat = Math.max(0, siteThemeHsl.s - spread);
-					const maxSat = Math.min(100, siteThemeHsl.s + spread);
+					const minSat = Math.max(0, siteThemeFgHSL.s - spread);
+					const maxSat = Math.min(100, siteThemeFgHSL.s + spread);
 					satSlider.setValues([minSat, maxSat]);
 				}
 				if (siteLightnessInput?.checked) {
 					const spread = litSpreadSlider.getValue();
-					const minLit = Math.max(0, siteThemeHsl.l - spread);
-					const maxLit = Math.min(100, siteThemeHsl.l + spread);
+					const minLit = Math.max(0, siteThemeFgHSL.l - spread);
+					const maxLit = Math.min(100, siteThemeFgHSL.l + spread);
 					litSlider.setValues([minLit, maxLit]);
 				}
 			}
