@@ -2,78 +2,7 @@
 // SLIDER UI COMPONENT
 // =====================================================
 
-// Shared slider styles (injected once)
-const sliderStyles = document.createElement('style');
-sliderStyles.textContent = `
-	.nc-slider { position: relative; height: 24px; margin: 0.5rem 0 0.25rem; }
-	.nc-slider-track {
-		position: absolute;
-		inset: 4px 0;
-		border: 1px solid var(--color-border, #333);
-		background: var(--color-code-bg, #444);
-		box-sizing: border-box;
-	}
-	/* Mapped track hidden by default */
-	.nc-slider .nc-slider-track-mapped {
-		display: none;
-		position: absolute;
-		top: 4px;
-		bottom: calc(50% + 1px);
-		left: 0;
-		right: 0;
-		border: 1px solid var(--color-border, #333);
-		background: var(--color-code-bg, #444);
-		box-sizing: border-box;
-	}
-	/* Split track for showing mapped vs full range - taller with gap */
-	.nc-slider.nc-slider-split { height: 34px; }
-	.nc-slider.nc-slider-split .nc-slider-track {
-		top: calc(50% + 1px);
-		bottom: 4px;
-	}
-	.nc-slider.nc-slider-split .nc-slider-track-mapped {
-		display: block !important;
-	}
-	.nc-slider-thumb {
-		position: absolute; top: 0; width: 14px; height: 22px;
-		background: var(--color-fg, #fff);
-		border: 2px solid var(--color-bg, #000);
-		outline: 1px solid var(--color-border, #333);
-		cursor: ew-resize; transform: translateX(-50%); z-index: 2;
-		display: flex; align-items: center; justify-content: center;
-		font-size: 8px;
-		color: var(--color-bg, #000); user-select: none;
-		box-sizing: border-box;
-	}
-	.nc-slider.nc-slider-split .nc-slider-thumb { height: 32px; }
-	.nc-slider-labels {
-		display: flex; 
-		justify-content: space-between; 
-		font-size: calc(var(--font-size-base, 1rem) * 0.625);
-		line-height: calc(var(--font-size-base, 1rem) * 0.625);
-		margin-bottom: 0.5rem;
-	}
-	.nc-slider-labels, .nc-slider-labels span {
-		color: var(--color-fg-dim, #888);
-	}
-	/* Simple single-value slider style */
-	.nc-slider.nc-slider-simple { height: 16px; }
-	.nc-slider-simple .nc-slider-track {
-		inset: 7px 0; height: 2px;
-		border: none;
-		background: var(--color-border, #333);
-	}
-	.nc-slider-simple .nc-slider-thumb {
-		top: 3px; width: 10px; height: 10px;
-		border-radius: 50%;
-	}
-	.nc-slider-simple .nc-slider-thumb::before {
-		content: '';
-		position: absolute;
-		inset: -8px;
-	}
-`;
-document.head.appendChild(sliderStyles);
+// Styles are now in src/styles.scss and compiled during build
 
 /**
  * Creates a slider (single or range type)

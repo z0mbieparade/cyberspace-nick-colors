@@ -73,6 +73,9 @@ function fetchOverrides() {
 	});
 }
 
+// Initialize our safe CSS variables (handles transparent values)
+initCssVariables();
+
 // Initial colorization (after fetching overrides)
 fetchOverrides().then(() => {
 	colorizeAll();
@@ -95,6 +98,26 @@ const observer = new MutationObserver((mutations) => {
 observer.observe(document.body, {
 	childList: true,
 	subtree: true
+});
+
+// Watch for theme changes on <html data-theme="...">
+const themeObserver = new MutationObserver((mutations) => {
+	for (const mutation of mutations) {
+		if (mutation.attributeName === 'data-theme') {
+			console.log('[Nick Colors] Theme changed, refreshing colors', mutation);
+			siteThemeName = mutation.target.getAttribute('data-theme') || null;
+			loadSiteCustomTheme();
+			loadSiteTheme();
+			initCssVariables();
+			refreshAllColors();
+			break;
+		}
+	}
+});
+
+themeObserver.observe(document.documentElement, {
+	attributes: true,
+	attributeFilter: ['data-theme']
 });
 
 console.log('[Nick Colors] Loaded. Right-click any colored username to customize.');

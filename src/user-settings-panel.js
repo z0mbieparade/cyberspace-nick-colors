@@ -2,11 +2,12 @@
 // USER SETTINGS PANEL
 // =====================================================
 
-function createUserSettingsPanel(username, currentStyles) {
+function createUserSettingsPanel(username, currentStyles) 
+{
 	// Filter out color, icon, and style variation properties from CSS string
 	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'invert'];
 	const filteredStyles = Object.fromEntries(
-		Object.entries(currentStyles).filter(([key]) => !styleVariationKeys.includes(key))
+		Object.entries(makeStylesObject(currentStyles)).filter(([key]) => !styleVariationKeys.includes(key))
 	);
 	const currentCssString = stylesToCssString(filteredStyles, ';\n');
 
@@ -54,8 +55,8 @@ function createUserSettingsPanel(username, currentStyles) {
 	const isRestricted = isHueRestricted || isSatRestricted || isLitRestricted;
 
 	// Determine source of color data for debug display
-	const baseColor = getBaseColor(username);
-	const mappedColor = applyRangeMapping(baseColor, eff);
+	const baseColor = getNickBase(username);
+	const mappedColor = applyRangeMappingToColor(baseColor, eff);
 	let colorSource = 'hash-generated';
 	let colorSourceData = '';
 	if (customNickColors[username]) {
@@ -82,12 +83,21 @@ function createUserSettingsPanel(username, currentStyles) {
 				'Color Source': colorSource,
 				'Saved Data': colorSourceData,
 				'Hash Values': `h:${hash} s:${hash2} l:${hash3} style:${hash4}`,
-				'Base Color (raw)': `H:${baseColor.h.toFixed(1)} S:${baseColor.s.toFixed(1)} L:${baseColor.l.toFixed(1)}`,
-				'Mapped Color': `H:${mappedColor.h.toFixed(1)} S:${mappedColor.s.toFixed(1)} L:${mappedColor.l.toFixed(1)}`,
-				'Effective Config': `H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`,
+				'Base Color (raw)': { 
+					txt: `H:${baseColor.h.toFixed(1)} S:${baseColor.s.toFixed(1)} L:${baseColor.l.toFixed(1)}`, 
+					elem: `<span class="nc-debug-color" style="background-color: hsl(${baseColor.h}, ${baseColor.s}%, ${baseColor.l}%)">BASE</span>`
+				},
+				'Mapped Color': { 
+					txt: `H:${mappedColor.h.toFixed(1)} S:${mappedColor.s.toFixed(1)} L:${mappedColor.l.toFixed(1)}`, 
+					elem: `<span class="nc-debug-color" style="background-color: hsl(${mappedColor.h}, ${mappedColor.s}%, ${mappedColor.l}%)">MAPPED</span>`
+				},
+				'Effective Config': { 
+					txt: `H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`, 
+					elem: `<span class="nc-debug-color" style="background-color: hsl(${eff.minHue}, ${eff.minSaturation}%, ${eff.minLightness}%)">MIN</span>-<span class="nc-debug-color" style="background-color: hsl(${eff.maxHue}, ${eff.maxSaturation}%, ${eff.maxLightness}%)">MAX</span>`
+				},
 				'Style Variations': `weight:${hashWeight} italic:${hashItalic} case:${hashCase}`
 			})}
-			${hasRemoteOverride ? `<div class="hint">Site-wide override: <code style="background: var(--color-code-bg, #222); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
+			${hasRemoteOverride ? `<div class="hint">Site-wide override: <code style="background: var(--nc-code-bg); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
 			<h4>Nick Color</h4>
 			<div id="picker-sliders"></div>
 			${createInputRow({
@@ -108,7 +118,7 @@ function createUserSettingsPanel(username, currentStyles) {
 				classes: 'no-padding-top'
 			})}
 			<div class="nc-input-row-stacked no-padding-top" id="picker-prepend-icon-container" style="display: ${initialPrependIconState === true ? 'block' : 'none'}">
-				${styleConfig.iconSet ? `<div class="picker-icon-options" data-target="picker-prepend-icon" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>` : ''}
+				${styleConfig.iconSet ? `<div class="picker-icon-options" data-target="picker-prepend-icon" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--nc-border); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>` : ''}
 				${createInputRow({ id: 'picker-prepend-icon', value: savedPrependIcon, placeholder: 'custom icon before nickname', classes: 'no-padding-top' })}
 			</div>
 			${createTriStateToggleRow({
@@ -119,7 +129,7 @@ function createUserSettingsPanel(username, currentStyles) {
 				classes: 'no-padding-top'
 			})}
 			<div class="nc-input-row-stacked no-padding-top" id="picker-append-icon-container" style="display: ${initialAppendIconState === true ? 'block' : 'none'}">
-				${styleConfig.iconSet ? `<div class="picker-icon-options" data-target="picker-append-icon" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--color-border, #333); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>` : ''}
+				${styleConfig.iconSet ? `<div class="picker-icon-options" data-target="picker-append-icon" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${styleConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--nc-border); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>` : ''}
 				${createInputRow({ id: 'picker-append-icon', value: savedAppendIcon, placeholder: 'custom icon after nickname', classes: 'no-padding-top' })}
 			</div>
 			<hr />
@@ -375,47 +385,54 @@ function createUserSettingsPanel(username, currentStyles) {
 
 	function updatePreview() {
 		updateGradients();
-		const color = getTextColor();
-		// Show mapped color in preview (what it will actually look like)
-		const effectiveConfig = getEffectiveColorConfig();
-		// Always apply mapping - slider values are raw base values
-		const mappedColor = mapColorToRange(color, effectiveConfig);
 
-		// Apply style variations based on state (null = use global/hash default)
-		const effectiveWeight = weightState !== null ? (weightState ? 'bold' : 'normal') :
-			(styleConfig.varyWeight ? hashWeight : 'normal');
-		const effectiveItalic = italicState !== null ? (italicState ? 'italic' : 'normal') :
-			(styleConfig.varyItalic ? hashItalic : 'normal');
-		const effectiveCase = caseState !== null ? (caseState ? 'small-caps' : 'normal') :
-			(styleConfig.varyCase ? hashCase : 'normal');
-
-		// Determine if we should invert (swap fg/bg)
-		let shouldInvert = false;
-		if (invertState === true) {
-			shouldInvert = true;
-		} else if (invertState === null) {
-			// Auto - check WCAG contrast ratio threshold
-			const hsl = parseColorToHsl(mappedColor);
-			if (hsl) {
-				const colorRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
-				const bgRgb = getBackgroundRgb();
-				const threshold = effectiveConfig.contrastThreshold || 0;
-				const contrastRatio = getContrastRatio(colorRgb, bgRgb);
-				shouldInvert = threshold > 0 && contrastRatio < threshold;
-			}
+		// Build temporary styles object from current dialog state
+		const tempStyles = { color: getTextColor(), ...parseCssText(cssInput.value) };
+		if (prependIconState === true) {
+			tempStyles.prependIcon = prependIconInput.value.trim();
+		} else if (prependIconState === false) {
+			tempStyles.prependIcon = '';
 		}
-		// invertState === false means explicitly disabled
+		if (appendIconState === true) {
+			tempStyles.appendIcon = appendIconInput.value.trim();
+		} else if (appendIconState === false) {
+			tempStyles.appendIcon = '';
+		}
+		if (weightState !== null) {
+			tempStyles.fontWeight = weightState ? 'bold' : 'normal';
+		}
+		if (italicState !== null) {
+			tempStyles.fontStyle = italicState ? 'italic' : 'normal';
+		}
+		if (caseState !== null) {
+			tempStyles.fontVariant = caseState ? 'small-caps' : 'normal';
+		}
+		if (invertState !== null) {
+			tempStyles.invert = invertState;
+		}
 
-		// Show icons in preview based on tri-state: true = custom, false = disabled, null = auto (global)
+		// Temporarily apply dialog state to customNickColors for applyStyles
+		const savedCustom = customNickColors[username];
+		customNickColors[username] = tempStyles;
+
+		// Match site-settings-panel behavior: set colorConfig to effective values
+		// and disable siteThemeConfig to prevent double-application of site theme adjustments
+		// The eff variable (computed at dialog open) already has site theme adjustments baked in
+		const savedColorConfig = { ...colorConfig };
+		const savedSiteThemeConfig = { ...siteThemeConfig };
+		Object.assign(colorConfig, eff);
+		siteThemeConfig.useHueRange = false;
+		siteThemeConfig.useSaturation = false;
+		siteThemeConfig.useLightness = false;
+
+		// Determine icons for preview
 		let prependValue = '';
 		let appendValue = '';
-		// Prepend icon state
 		if (prependIconState === true) {
 			prependValue = prependIconInput.value.trim();
 		} else if (prependIconState === null && styleConfig.prependIcon) {
 			prependValue = hashIcon;
 		}
-		// Append icon state
 		if (appendIconState === true) {
 			appendValue = appendIconInput.value.trim();
 		} else if (appendIconState === null && styleConfig.appendIcon) {
@@ -425,31 +442,31 @@ function createUserSettingsPanel(username, currentStyles) {
 		// Helper to apply styles to a preview element
 		const applyPreviewStyles = (el, isMention) => {
 			el.style.cssText = '';
-			if (shouldInvert) {
-				el.style.backgroundColor = mappedColor;
-				el.style.color = 'var(--color-fg, #fff)';
-			} else {
-				el.style.color = mappedColor;
-			}
-			Object.assign(el.style, parseCssText(cssInput.value));
-			el.style.fontWeight = effectiveWeight;
-			el.style.fontStyle = effectiveItalic;
-			el.style.fontVariant = effectiveCase;
-			const prefix = isMention ? '@' : '';
-			let displayText = prefix + username;
-			if (prependValue) displayText = prependValue + ' ' + displayText;
-			if (appendValue) displayText = displayText + ' ' + appendValue;
-			el.textContent = displayText;
+			applyStyles(el, username, isMention ? 'mention' : 'nick', false, {
+				prependIcon: prependValue,
+				appendIcon: appendValue
+			});
 		};
 
 		// Update both previews (false = not mention, true = mention)
 		applyPreviewStyles(preview, false);
 		if (previewMention) applyPreviewStyles(previewMention, true);
+
+		// Restore original configs AFTER applying preview styles
+		Object.assign(colorConfig, savedColorConfig);
+		Object.assign(siteThemeConfig, savedSiteThemeConfig);
+
+		// Restore original customNickColors
+		if (savedCustom !== undefined) {
+			customNickColors[username] = savedCustom;
+		} else {
+			delete customNickColors[username];
+		}
 	}
 
 	// Parse initial color - load raw saved values directly to sliders
 	if (currentStyles.color) {
-		const hsl = parseColorToHsl(currentStyles.color);
+		const hsl = parseColor(currentStyles.color, 'hsl');
 		if (hsl) {
 			hueSlider.setValue(hsl.h); satSlider.setValue(hsl.s); litSlider.setValue(hsl.l);
 		} else {
@@ -499,7 +516,7 @@ function createUserSettingsPanel(username, currentStyles) {
 					updatePreview();
 				}
 				// Brief visual feedback
-				option.style.background = 'var(--color-fg-dim, #666)';
+				option.style.background = 'var(--nc-fg-dim)';
 				setTimeout(() => { option.style.background = ''; }, 150);
 			}
 		});
@@ -729,27 +746,4 @@ function createUserSettingsPanel(username, currentStyles) {
 	}
 
 	updatePreview();
-}
-
-function refreshAllColors() {
-	document.querySelectorAll('[data-nick-colored]').forEach(el => {
-		// Restore original text if we have it stored
-		if (el.dataset.originalText) {
-			el.textContent = el.dataset.originalText;
-		}
-		// Clear all our data attributes
-		delete el.dataset.nickColored;
-		delete el.dataset.iconApplied;
-		delete el.dataset.originalText;
-		delete el.dataset.username;
-		el.style.cssText = ''; // Clear applied styles
-	});
-	// Remove mention spans and restore original text
-	document.querySelectorAll('[data-mention-colored]').forEach(el => {
-		// Reconstruct original mention from stored username (avoids including icon)
-		const username = el.dataset.username;
-		const originalText = username ? `@${username}` : el.textContent;
-		el.replaceWith(document.createTextNode(originalText));
-	});
-	colorizeAll();
 }

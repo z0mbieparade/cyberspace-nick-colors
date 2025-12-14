@@ -3,9 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const { minify } = require('terser');
+const sass = require('sass');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const OUTPUT_FILE = path.join(__dirname, 'cyberspace-nick-colors.user.js');
+const STYLES_FILE = path.join(SRC_DIR, 'styles.scss');
 
 // Get version from command line or default
 const version = process.argv[2] || '1.0.0';
@@ -33,12 +35,39 @@ const metadata = `// ==UserScript==
 // @run-at       document-idle
 // ==/UserScript==`;
 
+// Compile SCSS to CSS
+let compiledCSS = '';
+if (fs.existsSync(STYLES_FILE)) {
+	try {
+		const result = sass.compile(STYLES_FILE, { style: 'compressed' });
+		compiledCSS = result.css;
+		console.log(`  + styles.scss (${(compiledCSS.length / 1024).toFixed(1)} KB compiled)`);
+	} catch (err) {
+		console.error('SCSS compilation failed:', err.message);
+		process.exit(1);
+	}
+} else {
+	console.warn('  Warning: styles.scss not found, skipping styles');
+}
+
+// Style injection code (CSS will be inserted at build time)
+const styleInjection = `
+// Inject compiled styles
+const ncStyles = document.createElement('style');
+ncStyles.id = 'nc-styles';
+ncStyles.textContent = ${JSON.stringify(compiledCSS)};
+document.head.appendChild(ncStyles);
+`;
+
 // Build parts: can be a filename (relative to src/) or a raw string
 const codeParts = [
 	// IIFE wrapper start
 `(function() {
 	'use strict';
 	const VERSION = '${version}';`,
+
+	// Inject compiled styles first
+	styleInjection,
 
 	// Source files (in order)
 	'helper-functions.js',
