@@ -73,31 +73,35 @@ describe('stylesToCssString', () => {
 	});
 });
 
-describe('parseColorToHsl', () => {
+describe('parseColor', () => {
 	it('parses hsl string', () => {
-		const result = parseColorToHsl('hsl(180, 50%, 60%)');
+		const result = parseColor('hsl(180, 50%, 60%)');
 		expect(result).toEqual({ h: 180, s: 50, l: 60 });
 	});
 
 	it('parses hsl without % signs', () => {
-		const result = parseColorToHsl('hsl(90, 75, 25)');
+		const result = parseColor('hsl(90, 75, 25)');
 		expect(result).toEqual({ h: 90, s: 75, l: 25 });
 	});
 
 	it('parses hex color', () => {
-		const result = parseColorToHsl('#ff0000');
+		const result = parseColor('#ff0000');
 		expect(result).toEqual({ h: 0, s: 100, l: 50 });
 	});
 
 	it('returns null for empty input', () => {
-		expect(parseColorToHsl('')).toBeNull();
-		expect(parseColorToHsl(null)).toBeNull();
-		expect(parseColorToHsl(undefined)).toBeNull();
+		expect(parseColor('')).toBeNull();
+		expect(parseColor(null)).toBeNull();
+		expect(parseColor(undefined)).toBeNull();
+	});
+
+	it('parses rgb color', () => {
+		const result = parseColor('rgb(255, 0, 0)');
+		expect(result).toEqual({ h: 0, s: 100, l: 50 });
 	});
 
 	it('returns null for unsupported formats', () => {
-		expect(parseColorToHsl('rgb(255, 0, 0)')).toBeNull();
-		expect(parseColorToHsl('red')).toBeNull();
+		expect(parseColor('red')).toBeNull();
 	});
 });
 

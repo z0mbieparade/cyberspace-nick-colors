@@ -97,6 +97,7 @@ function isLikelyUsername(element) {
 
 function colorizeAll() {
 	const selector = USERNAME_SELECTORS.join(', ');
+
 	document.querySelectorAll(selector).forEach(el => {
 		if (!isLikelyUsername(el)) return;
 
@@ -191,9 +192,12 @@ function colorizeMentions() {
 			span.textContent = m.full;
 
 			const isInverted = INVERTED_CONTAINERS.length > 0 &&
-				textNode.parentElement?.closest(INVERTED_CONTAINERS.join(', '));
+				!!textNode.parentElement?.closest(INVERTED_CONTAINERS.join(', '));
 
-			applyStyles(span, m.username, 'mention', isInverted);
+			applyStyles(span, m.username, {
+				matchType: 'mention',
+				isInverted
+			});
 
 			//  Object.assign(span.style, styles);
 			fragment.appendChild(span);

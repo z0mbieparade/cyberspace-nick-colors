@@ -28,7 +28,7 @@ describe('isValidUsername', () => {
 	});
 });
 
-describe('getBaseColor', () => {
+describe('getNickBase', () => {
 	beforeEach(() => {
 		// Clear custom colors
 		Object.keys(customNickColors).forEach(k => delete customNickColors[k]);
@@ -36,13 +36,13 @@ describe('getBaseColor', () => {
 	});
 
 	it('returns consistent color for same username', () => {
-		const color1 = getBaseColor('testuser');
-		const color2 = getBaseColor('testuser');
+		const color1 = getNickBase('testuser');
+		const color2 = getNickBase('testuser');
 		expect(color1).toEqual(color2);
 	});
 
 	it('returns HSL object with valid ranges', () => {
-		const color = getBaseColor('anyuser');
+		const color = getNickBase('anyuser');
 		expect(color.h).toBeGreaterThanOrEqual(0);
 		expect(color.h).toBeLessThan(360);
 		expect(color.s).toBeGreaterThanOrEqual(0);
@@ -53,20 +53,20 @@ describe('getBaseColor', () => {
 
 	it('uses custom color when set', () => {
 		customNickColors['testuser'] = { color: 'hsl(180, 50%, 50%)' };
-		const color = getBaseColor('testuser');
+		const color = getNickBase('testuser');
 		expect(color).toEqual({ h: 180, s: 50, l: 50 });
 	});
 
 	it('uses manual override when no custom color', () => {
 		MANUAL_OVERRIDES['testuser'] = { color: 'hsl(90, 75%, 60%)' };
-		const color = getBaseColor('testuser');
+		const color = getNickBase('testuser');
 		expect(color).toEqual({ h: 90, s: 75, l: 60 });
 	});
 
 	it('prioritizes custom color over manual override', () => {
 		customNickColors['testuser'] = { color: 'hsl(180, 50%, 50%)' };
 		MANUAL_OVERRIDES['testuser'] = { color: 'hsl(90, 75%, 60%)' };
-		const color = getBaseColor('testuser');
+		const color = getNickBase('testuser');
 		expect(color).toEqual({ h: 180, s: 50, l: 50 });
 	});
 });
@@ -79,7 +79,9 @@ describe('applyRangeMapping', () => {
 			minSaturation: 60, maxSaturation: 100,
 			minLightness: 40, maxLightness: 80
 		};
-		const result = applyRangeMapping(base, config);
+		const result = applyRangeMappingToColor(base, 'hsl', {
+			effectiveConfig: config
+		});
 
 		// h unchanged (full range)
 		expect(result.h).toBe(180);
@@ -94,12 +96,11 @@ describe('generateStyles', () => {
 	beforeEach(() => {
 		Object.keys(customNickColors).forEach(k => delete customNickColors[k]);
 		Object.keys(MANUAL_OVERRIDES).forEach(k => delete MANUAL_OVERRIDES[k]);
-		Object.assign(colorConfig, DEFAULT_COLOR_CONFIG);
-		Object.assign(styleConfig, DEFAULT_STYLE_CONFIG);
+		Object.assign(siteConfig, DEFAULT_SITE_CONFIG);
 	});
 
 	it('returns object with color property', () => {
-		const styles = generateStyles('testuser');
+		const { styles } = generateStyles('testuser');
 		expect(styles.color).toBeDefined();
 		expect(styles.color).toMatch(/^hsl\(/);
 	});
@@ -109,16 +110,16 @@ describe('generateStyles', () => {
 			color: 'hsl(180, 50%, 50%)',
 			backgroundColor: 'hsl(0, 0%, 20%)'
 		};
-		const styles = generateStyles('testuser');
+		const { styles } = generateStyles('testuser');
 		expect(styles.backgroundColor).toBe('hsl(0, 0%, 20%)');
 	});
 
 	it('applies font variations when enabled', () => {
-		styleConfig.varyWeight = true;
-		styleConfig.varyItalic = true;
-		styleConfig.varyCase = true;
+		siteConfig.varyWeight = true;
+		siteConfig.varyItalic = true;
+		siteConfig.varyCase = true;
 
-		const styles = generateStyles('testuser');
+		const { styles } = generateStyles('testuser');
 		expect(['normal', 'bold']).toContain(styles.fontWeight);
 		expect(['normal', 'italic']).toContain(styles.fontStyle);
 		expect(['normal', 'small-caps']).toContain(styles.fontVariant);
@@ -128,26 +129,26 @@ describe('generateStyles', () => {
 describe('getHashBasedIcon', () => {
 	it('returns null when icons disabled', () => {
 		const config = { prependIcon: false, appendIcon: false, iconSet: '★ ♦ ♠' };
-		const icon = getHashBasedIcon('testuser', config);
+		const icon = getHashBasedIcon('testuser', { effectiveConfig: config });
 		expect(icon).toBeNull();
 	});
 
 	it('returns null when iconSet empty', () => {
 		const config = { prependIcon: true, appendIcon: false, iconSet: '' };
-		const icon = getHashBasedIcon('testuser', config);
+		const icon = getHashBasedIcon('testuser', { effectiveConfig: config });
 		expect(icon).toBeNull();
 	});
 
 	it('returns consistent icon for same username', () => {
 		const config = { prependIcon: true, appendIcon: false, iconSet: '★ ♦ ♠ ♣' };
-		const icon1 = getHashBasedIcon('testuser', config);
-		const icon2 = getHashBasedIcon('testuser', config);
+		const icon1 = getHashBasedIcon('testuser', { effectiveConfig: config });
+		const icon2 = getHashBasedIcon('testuser', { effectiveConfig: config });
 		expect(icon1).toBe(icon2);
 	});
 
 	it('returns icon from iconSet', () => {
 		const config = { prependIcon: true, appendIcon: false, iconSet: '★ ♦ ♠' };
-		const icon = getHashBasedIcon('testuser', config);
+		const icon = getHashBasedIcon('testuser', { effectiveConfig: config });
 		expect(['★', '♦', '♠']).toContain(icon);
 	});
 });
@@ -156,7 +157,7 @@ describe('DOM manipulation', () => {
 	beforeEach(() => {
 		document.body.innerHTML = '<div id="chat"></div>';
 		Object.keys(customNickColors).forEach(k => delete customNickColors[k]);
-		Object.assign(colorConfig, DEFAULT_COLOR_CONFIG);
+		Object.assign(siteConfig, DEFAULT_SITE_CONFIG);
 	});
 
 	describe('applyStyles', () => {
@@ -171,8 +172,8 @@ describe('DOM manipulation', () => {
 		});
 
 		it('applies prepend icon when enabled', () => {
-			styleConfig.prependIcon = true;
-			styleConfig.iconSet = '★';
+			siteConfig.prependIcon = true;
+			siteConfig.iconSet = '★';
 
 			const el = document.createElement('span');
 			el.textContent = 'testuser';
@@ -235,7 +236,7 @@ describe('DOM manipulation', () => {
 	describe('colorizeMentions', () => {
 		beforeEach(() => {
 			// Reset style config to avoid icon pollution from other tests
-			Object.assign(styleConfig, DEFAULT_STYLE_CONFIG);
+			Object.assign(siteConfig, DEFAULT_SITE_CONFIG);
 		});
 
 		it('wraps @mentions in styled spans', () => {

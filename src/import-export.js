@@ -27,14 +27,8 @@ function exportSettings() {
 	};
 
 	// Only include configs that have non-default values
-	const colorDiff = getNonDefaultValues(colorConfig, DEFAULT_COLOR_CONFIG);
-	if (colorDiff) data.colorConfig = colorDiff;
-
-	const siteThemeDiff = getNonDefaultValues(siteThemeConfig, DEFAULT_SITE_THEME_CONFIG);
-	if (siteThemeDiff) data.siteThemeConfig = siteThemeDiff;
-
-	const styleDiff = getNonDefaultValues(styleConfig, DEFAULT_STYLE_CONFIG);
-	if (styleDiff) data.styleConfig = styleDiff;
+	const siteConfigDiff = getNonDefaultValues(siteConfig, DEFAULT_SITE_CONFIG);
+	if (siteConfigDiff) data.siteConfig = siteConfigDiff;
 
 	// Always include custom nick colors if any exist
 	if (Object.keys(customNickColors).length > 0) {
@@ -64,21 +58,9 @@ function importSettings(data) {
 		}
 
 		// Import color config
-		if (data.colorConfig) {
-			colorConfig = { ...DEFAULT_COLOR_CONFIG, ...data.colorConfig };
-			saveColorConfig();
-		}
-
-		// Import site theme config
-		if (data.siteThemeConfig) {
-			siteThemeConfig = { ...DEFAULT_SITE_THEME_CONFIG, ...data.siteThemeConfig };
-			saveSiteThemeConfig();
-		}
-
-		// Import style config
-		if (data.styleConfig) {
-			styleConfig = { ...DEFAULT_STYLE_CONFIG, ...data.styleConfig };
-			saveStyleConfig();
+		if (data.siteConfig) {
+			siteConfig = { ...DEFAULT_SITE_CONFIG, ...data.siteConfig };
+			saveSiteConfig();
 		}
 
 		// Import custom nick colors
@@ -105,12 +87,12 @@ const KEY_MAP = {
 	maxHue: 'xH',
 	contrastThreshold: 'cT',
 	// Site theme config
-	useHueRange: 'uH',
+	useSiteThemeHue: 'uH',
 	hueSpread: 'hS',
-	useSaturation: 'uS',
-	saturationSpread: 'sS',
-	useLightness: 'uL',
-	lightnessSpread: 'lS',
+	useSiteThemeSat: 'uS',
+	satSpread: 'sS',
+	useSiteThemeLit: 'uL',
+	litSpread: 'lS',
 	// Style config
 	varyWeight: 'vW',
 	varyItalic: 'vI',
@@ -126,9 +108,7 @@ const KEY_MAP = {
 	fontVariant: 'fV',
 	invert: 'inv',
 	// Config sections
-	colorConfig: 'cc',
-	siteThemeConfig: 'stc',
-	styleConfig: 'sc',
+	siteConfig: 'sc',
 	customNickColors: 'cnc',
 	version: 'v',
 	exportedAt: 'at'

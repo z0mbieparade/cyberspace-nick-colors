@@ -8,7 +8,7 @@ import './setup.js';
 describe('Range Mapping with Site Settings', () => {
 	beforeEach(() => {
 		// Reset to defaults
-		Object.assign(colorConfig, JSON.parse(JSON.stringify(DEFAULT_COLOR_CONFIG)));
+		Object.assign(siteConfig, JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG)));
 	});
 
 	describe('mapToRange (saturation/lightness)', () => {
@@ -72,7 +72,9 @@ describe('Range Mapping with Site Settings', () => {
 				minSaturation: 70, maxSaturation: 100,
 				minLightness: 0, maxLightness: 100
 			};
-			const result = applyRangeMapping(base, config);
+			const result = applyRangeMappingToColor(base, 'hsl', {
+				effectiveConfig: config
+			});
 
 			// s: 50% of 0-100 maps to 50% of 70-100 = 85
 			expect(result.s).toBe(85);
@@ -88,7 +90,9 @@ describe('Range Mapping with Site Settings', () => {
 				minSaturation: 0, maxSaturation: 100,
 				minLightness: 40, maxLightness: 80
 			};
-			const result = applyRangeMapping(base, config);
+			const result = applyRangeMappingToColor(base, 'hsl', {
+				effectiveConfig: config
+			});
 
 			// l: 50% of 0-100 maps to 50% of 40-80 = 60
 			expect(result.l).toBe(60);
@@ -101,7 +105,9 @@ describe('Range Mapping with Site Settings', () => {
 				minSaturation: 0, maxSaturation: 100,
 				minLightness: 0, maxLightness: 100
 			};
-			const result = applyRangeMapping(base, config);
+			const result = applyRangeMappingToColor(base, 'hsl', {
+				effectiveConfig: config
+			});
 
 			// h: 180/360 = 50%, maps to 50% of 200-280 = 240
 			expect(result.h).toBe(240);
@@ -114,7 +120,9 @@ describe('Range Mapping with Site Settings', () => {
 				minSaturation: 60, maxSaturation: 90,
 				minLightness: 45, maxLightness: 75
 			};
-			const result = applyRangeMapping(base, config);
+			const result = applyRangeMappingToColor(base, 'hsl', {
+				effectiveConfig: config
+			});
 
 			// h: 180/360 = 50% -> 150
 			expect(result.h).toBe(150);
@@ -125,26 +133,26 @@ describe('Range Mapping with Site Settings', () => {
 		});
 	});
 
-	describe('getEffectiveColorConfig with site theme', () => {
+	describe('getEffectiveSiteConfig with site theme', () => {
 		beforeEach(() => {
 			// Reset site theme config
-			Object.assign(siteThemeConfig, JSON.parse(JSON.stringify(DEFAULT_SITE_THEME_CONFIG)));
+			Object.assign(siteConfig, JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG)));
 		});
-
-		it('returns base colorConfig when no site theme', () => {
+		
+		it('returns base siteConfig when no site theme', () => {
 			// siteThemeHsl is undefined in test env
-			const effective = getEffectiveColorConfig();
-			expect(effective.minSaturation).toBe(colorConfig.minSaturation);
-			expect(effective.maxSaturation).toBe(colorConfig.maxSaturation);
+			const effective = getEffectiveSiteConfig();
+			expect(effective.minSaturation).toBe(siteConfig.minSaturation);
+			expect(effective.maxSaturation).toBe(siteConfig.maxSaturation);
 		});
 
-		it('respects colorConfig ranges when site theme disabled', () => {
-			colorConfig.minSaturation = 80;
-			colorConfig.maxSaturation = 100;
-			colorConfig.minLightness = 50;
-			colorConfig.maxLightness = 70;
+		it('respects siteConfig ranges when site theme disabled', () => {
+			siteConfig.minSaturation = 80;
+			siteConfig.maxSaturation = 100;
+			siteConfig.minLightness = 50;
+			siteConfig.maxLightness = 70;
 
-			const effective = getEffectiveColorConfig();
+			const effective = getEffectiveSiteConfig();
 			expect(effective.minSaturation).toBe(80);
 			expect(effective.maxSaturation).toBe(100);
 			expect(effective.minLightness).toBe(50);
@@ -160,22 +168,21 @@ describe('Range Mapping with Site Settings', () => {
 			if (match) {
 				return { h: parseFloat(match[1]), s: parseFloat(match[2]), l: parseFloat(match[3]) };
 			}
-			return parseColorToHsl(color);
+			return parseColor(color);
 		}
 
 		beforeEach(() => {
 			Object.keys(customNickColors).forEach(k => delete customNickColors[k]);
 			Object.keys(MANUAL_OVERRIDES).forEach(k => delete MANUAL_OVERRIDES[k]);
-			Object.assign(colorConfig, JSON.parse(JSON.stringify(DEFAULT_COLOR_CONFIG)));
-			Object.assign(styleConfig, JSON.parse(JSON.stringify(DEFAULT_STYLE_CONFIG)));
+			Object.assign(siteConfig, JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG)));
 		});
 
 		it('generates color within saturation range', () => {
-			colorConfig.minSaturation = 80;
-			colorConfig.maxSaturation = 100;
+			siteConfig.minSaturation = 80;
+			siteConfig.maxSaturation = 100;
 
-			const styles = generateStyles('testuser');
-			const hsl = parseHslWithDecimals(styles.color);
+			const result = generateStyles('testuser');
+			const hsl = parseHslWithDecimals(result.styles.color);
 
 			expect(hsl).not.toBeNull();
 			expect(hsl.s).toBeGreaterThanOrEqual(80);
@@ -183,11 +190,11 @@ describe('Range Mapping with Site Settings', () => {
 		});
 
 		it('generates color within lightness range', () => {
-			colorConfig.minLightness = 50;
-			colorConfig.maxLightness = 70;
+			siteConfig.minLightness = 50;
+			siteConfig.maxLightness = 70;
 
-			const styles = generateStyles('testuser');
-			const hsl = parseHslWithDecimals(styles.color);
+			const result = generateStyles('testuser');
+			const hsl = parseHslWithDecimals(result.styles.color);
 
 			expect(hsl).not.toBeNull();
 			expect(hsl.l).toBeGreaterThanOrEqual(50);
@@ -195,12 +202,12 @@ describe('Range Mapping with Site Settings', () => {
 		});
 
 		it('generates color within hue range', () => {
-			colorConfig.minHue = 200;
-			colorConfig.maxHue = 280;
-			colorConfig.contrastThreshold = 0; // Disable inversion for this test
+			siteConfig.minHue = 200;
+			siteConfig.maxHue = 280;
+			siteConfig.contrastThreshold = 0; // Disable inversion for this test
 
-			const styles = generateStyles('testuser');
-			const hsl = parseHslWithDecimals(styles.color);
+			const result = generateStyles('testuser');
+			const hsl = parseHslWithDecimals(result.styles.color);
 
 			expect(hsl).not.toBeNull();
 			expect(hsl.h).toBeGreaterThanOrEqual(200);
@@ -208,18 +215,18 @@ describe('Range Mapping with Site Settings', () => {
 		});
 
 		it('generates consistent colors for same username', () => {
-			const styles1 = generateStyles('consistentuser');
-			const styles2 = generateStyles('consistentuser');
+			const result1 = generateStyles('consistentuser');
+			const result2 = generateStyles('consistentuser');
 
-			expect(styles1.color).toBe(styles2.color);
+			expect(result1.styles.color).toBe(result2.styles.color);
 		});
 
 		it('generates different colors for different usernames', () => {
-			const styles1 = generateStyles('user_alpha');
-			const styles2 = generateStyles('user_beta');
+			const result1 = generateStyles('user_alpha');
+			const result2 = generateStyles('user_beta');
 
 			// Very unlikely to be exactly the same
-			expect(styles1.color).not.toBe(styles2.color);
+			expect(result1.styles.color).not.toBe(result2.styles.color);
 		});
 	});
 });

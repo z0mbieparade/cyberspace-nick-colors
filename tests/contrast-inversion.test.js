@@ -9,8 +9,7 @@ describe('Contrast and Inversion', () => {
 	beforeEach(() => {
 		Object.keys(customNickColors).forEach(k => delete customNickColors[k]);
 		Object.keys(MANUAL_OVERRIDES).forEach(k => delete MANUAL_OVERRIDES[k]);
-		Object.assign(colorConfig, JSON.parse(JSON.stringify(DEFAULT_COLOR_CONFIG)));
-		Object.assign(styleConfig, JSON.parse(JSON.stringify(DEFAULT_STYLE_CONFIG)));
+		Object.assign(siteConfig, JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG)));
 	});
 
 	describe('WCAG helper functions', () => {
@@ -76,23 +75,23 @@ describe('Contrast and Inversion', () => {
 
 		describe('getRelativeLuminance', () => {
 			it('returns 0 for black', () => {
-				expect(getRelativeLuminance(0, 0, 0)).toBe(0);
+				expect(getRelativeLuminance({ r: 0, g: 0, b: 0 })).toBe(0);
 			});
 
 			it('returns 1 for white', () => {
-				expect(getRelativeLuminance(255, 255, 255)).toBe(1);
+				expect(getRelativeLuminance({ r: 255, g: 255, b: 255 })).toBe(1);
 			});
 
 			it('returns correct luminance for red', () => {
 				// Red coefficient is 0.2126
-				const lum = getRelativeLuminance(255, 0, 0);
+				const lum = getRelativeLuminance({ r: 255, g: 0, b: 0 });
 				expect(lum).toBeCloseTo(0.2126, 2);
 			});
 
 			it('returns higher luminance for green than red', () => {
 				// Human eye is most sensitive to green
-				const redLum = getRelativeLuminance(255, 0, 0);
-				const greenLum = getRelativeLuminance(0, 255, 0);
+				const redLum = getRelativeLuminance({ r: 255, g: 0, b: 0 });
+				const greenLum = getRelativeLuminance({ r: 0, g: 255, b: 0 });
 				expect(greenLum).toBeGreaterThan(redLum);
 			});
 		});
@@ -123,55 +122,27 @@ describe('Contrast and Inversion', () => {
 		});
 	});
 
-	describe('getBackgroundRgb', () => {
-		it('returns an RGB object', () => {
-			const rgb = getBackgroundRgb();
-			expect(rgb).toHaveProperty('r');
-			expect(rgb).toHaveProperty('g');
-			expect(rgb).toHaveProperty('b');
-		});
-
-		it('returns values in 0-255 range', () => {
-			const rgb = getBackgroundRgb();
-			expect(rgb.r).toBeGreaterThanOrEqual(0);
-			expect(rgb.r).toBeLessThanOrEqual(255);
-			expect(rgb.g).toBeGreaterThanOrEqual(0);
-			expect(rgb.g).toBeLessThanOrEqual(255);
-			expect(rgb.b).toBeGreaterThanOrEqual(0);
-			expect(rgb.b).toBeLessThanOrEqual(255);
-		});
-
-		it('defaults to dark (near black) when no theme', () => {
-			// In test env without site theme, should default to dark
-			const rgb = getBackgroundRgb();
-			// Default is { r: 10, g: 10, b: 10 }
-			expect(rgb.r).toBeLessThan(50);
-			expect(rgb.g).toBeLessThan(50);
-			expect(rgb.b).toBeLessThan(50);
-		});
-	});
-
 	describe('Contrast threshold detection', () => {
 		it('does not invert when contrast threshold is 0', () => {
-			colorConfig.contrastThreshold = 0;
+			siteConfig.contrastThreshold = 0;
 			// Force a low lightness color
-			colorConfig.minLightness = 10;
-			colorConfig.maxLightness = 20;
+			siteConfig.minLightness = 10;
+			siteConfig.maxLightness = 20;
 
-			const styles = generateStyles('darkuser');
+			const { styles } = generateStyles('darkuser');
 
 			// Should not have background color (no inversion)
 			expect(styles.backgroundColor).toBeUndefined();
 		});
 
 		it('inverts when WCAG contrast ratio is below threshold', () => {
-			colorConfig.contrastThreshold = 4.5; // WCAG AA
+			siteConfig.contrastThreshold = 4.5; // WCAG AA
 			// Force very low lightness (poor contrast on dark background)
-			colorConfig.minLightness = 5;
-			colorConfig.maxLightness = 15;
+			siteConfig.minLightness = 5;
+			siteConfig.maxLightness = 15;
 
-			const styles = generateStyles('verydarkuser');
-			const hsl = parseColorToHsl(styles.backgroundColor || styles.color);
+			const { styles } = generateStyles('verydarkuser');
+			const hsl = parseColor(styles.backgroundColor || styles.color);
 
 			// Low lightness on dark bg = poor contrast ratio, should invert
 			if (hsl && hsl.l <= 15) {
@@ -180,28 +151,28 @@ describe('Contrast and Inversion', () => {
 		});
 
 		it('does not invert when WCAG contrast ratio is good', () => {
-			colorConfig.contrastThreshold = 4.5; // WCAG AA
+			siteConfig.contrastThreshold = 4.5; // WCAG AA
 			// Force high lightness (good contrast on dark background)
-			colorConfig.minLightness = 70;
-			colorConfig.maxLightness = 90;
+			siteConfig.minLightness = 70;
+			siteConfig.maxLightness = 90;
 
-			const styles = generateStyles('brightuser');
+			const { styles } = generateStyles('brightuser');
 
 			// High lightness on dark bg = good contrast ratio, no inversion
 			expect(styles.backgroundColor).toBeUndefined();
 		});
 
 		it('uses WCAG AA threshold (4.5) by default', () => {
-			expect(DEFAULT_COLOR_CONFIG.contrastThreshold).toBe(4.5);
+			expect(DEFAULT_SITE_CONFIG.contrastThreshold).toBe(4.5);
 		});
 	});
 
 	describe('Per-user invert setting', () => {
 		it('forces inversion when user setting is true', () => {
-			colorConfig.contrastThreshold = 0; // Disable auto-invert
+			siteConfig.contrastThreshold = 0; // Disable auto-invert
 			customNickColors['forceinvert'] = { invert: true };
 
-			const styles = generateStyles('forceinvert');
+			const { styles } = generateStyles('forceinvert');
 
 			expect(styles.backgroundColor).toBeDefined();
 			// Text color is now chosen based on which contrasts better with the bg
@@ -210,12 +181,12 @@ describe('Contrast and Inversion', () => {
 		});
 
 		it('prevents inversion when user setting is false', () => {
-			colorConfig.contrastThreshold = 21; // Would normally always invert
-			colorConfig.minLightness = 5;
-			colorConfig.maxLightness = 15;
+			siteConfig.contrastThreshold = 21; // Would normally always invert
+			siteConfig.minLightness = 5;
+			siteConfig.maxLightness = 15;
 			customNickColors['noinvert'] = { invert: false };
 
-			const styles = generateStyles('noinvert');
+			const { styles } = generateStyles('noinvert');
 
 			// Should not invert despite low contrast
 			expect(styles.backgroundColor).toBeUndefined();
@@ -224,11 +195,11 @@ describe('Contrast and Inversion', () => {
 		it('uses auto behavior when user setting is undefined', () => {
 			// This test verifies that auto-contrast detection works
 			// With high contrast, should NOT invert
-			colorConfig.contrastThreshold = 4.5;
-			colorConfig.minLightness = 70;
-			colorConfig.maxLightness = 90; // Far from bg (~10)
+			siteConfig.contrastThreshold = 4.5;
+			siteConfig.minLightness = 70;
+			siteConfig.maxLightness = 90; // Far from bg (~10)
 
-			const styles = generateStyles('autocontrastuser');
+			const { styles } = generateStyles('autocontrastuser');
 
 			// High contrast should NOT invert (no backgroundColor)
 			expect(styles.backgroundColor).toBeUndefined();
@@ -244,18 +215,18 @@ describe('Contrast and Inversion', () => {
 				invert: true
 			};
 
-			const styles = generateStyles('inverttest');
+			const { styles } = generateStyles('inverttest');
 
 			// Background should be the mapped version of the color
 			expect(styles.backgroundColor).toBeDefined();
-			const bgHsl = parseColorToHsl(styles.backgroundColor);
+			const bgHsl = parseColor(styles.backgroundColor);
 			expect(bgHsl).not.toBeNull();
 		});
 
 		it('sets text color to a CSS variable when inverting', () => {
 			customNickColors['fgtest'] = { invert: true };
 
-			const styles = generateStyles('fgtest');
+			const { styles } = generateStyles('fgtest');
 
 			// Text color is now chosen based on which contrasts better with the bg
 			expect(styles.color).toMatch(/^var\(--nc-(fg|bg)\)/);
@@ -264,16 +235,16 @@ describe('Contrast and Inversion', () => {
 		it('adds padding when inverting', () => {
 			customNickColors['paddingtest'] = { invert: true };
 
-			const styles = generateStyles('paddingtest');
+			const { styles } = generateStyles('paddingtest');
 
 			expect(styles.padding).toBe('0 0.25em');
 		});
 
 		it('does not add padding when not inverting', () => {
-			colorConfig.contrastThreshold = 0;
+			siteConfig.contrastThreshold = 0;
 			customNickColors['nopaddingtest'] = { invert: false };
 
-			const styles = generateStyles('nopaddingtest');
+			const { styles } = generateStyles('nopaddingtest');
 
 			expect(styles.padding).toBeUndefined();
 		});
@@ -287,7 +258,7 @@ describe('Contrast and Inversion', () => {
 				invert: true  // This should be ignored since bg is already set
 			};
 
-			const styles = generateStyles('custombg');
+			const { styles } = generateStyles('custombg');
 
 			// Should keep the custom background
 			expect(styles.backgroundColor).toBe('hsl(0, 0%, 20%)');
@@ -315,7 +286,7 @@ describe('Contrast and Inversion', () => {
 		});
 
 		it('applies non-inverted styles to element', () => {
-			colorConfig.contrastThreshold = 0;
+			siteConfig.contrastThreshold = 0;
 
 			const el = document.createElement('span');
 			el.textContent = 'normaluser';
@@ -338,9 +309,9 @@ describe('Contrast and Inversion', () => {
 
 		it('applies contrast-aware styling in inverted containers', () => {
 			// Force a color that has poor contrast on light backgrounds
-			colorConfig.contrastThreshold = 4.5;
-			colorConfig.minLightness = 70;
-			colorConfig.maxLightness = 90;
+			siteConfig.contrastThreshold = 4.5;
+			siteConfig.minLightness = 70;
+			siteConfig.maxLightness = 90;
 
 			const el = document.querySelector('.nick');
 			applyStyles(el, 'testuser');

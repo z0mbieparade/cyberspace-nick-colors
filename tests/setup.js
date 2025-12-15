@@ -57,6 +57,7 @@ const sourceFiles = [
 	'nick-functions.js',
 	'slider-component.js',
 	'dialog-component.js',
+	'settings-engine.js',
 	'user-settings-panel.js',
 	'site-settings-panel.js',
 	// Note: init.js is excluded as it has side effects
@@ -86,20 +87,19 @@ const script = new Function(code + `
 		getContrastRatio,
 		toKebabCase,
 		stylesToCssString,
-		parseColorToHsl,
+		parseColor,
 		mapHueToRange,
 		mapToRange,
 		mapColorToRange,
-		getBackgroundRgb,
-		getForegroundRgb,
 		adjustBgForContrast,
-		getInvertedColors,
-		applyHueRangeMappingToHex,
-		applyRangeMappingToHex,
-		saveSiteThemeConfig,
-		getEffectiveColorConfig,
-		saveColorConfig,
+		adjustContrastToThreshold,
+		pickBestContrastingColor,
+		applyRangeMappingToColor,
+		getEffectiveSiteConfig,
+		saveSiteConfig,
 		hashString,
+		getThemeColors,
+		getThemeDefaultSettings,
 
 		// Import/Export
 		getNonDefaultValues,
@@ -109,8 +109,8 @@ const script = new Function(code + `
 		maxifyKeys,
 
 		// Nick style functions
-		getBaseColor,
-		applyRangeMapping,
+		getNickBase,
+		getMappedNickColor,
 		getRawStylesForPicker,
 		generateStyles,
 		getHashBasedIcon,
@@ -126,14 +126,13 @@ const script = new Function(code + `
 		colorizeMentions,
 		refreshAllColors,
 
+		// Settings engine
+		createSettingsEngine,
+
 		// Config objects
-		colorConfig,
-		siteThemeConfig,
-		styleConfig,
+		siteConfig,
 		customNickColors,
-		DEFAULT_COLOR_CONFIG,
-		DEFAULT_SITE_THEME_CONFIG,
-		DEFAULT_STYLE_CONFIG,
+		DEFAULT_SITE_CONFIG,
 		MANUAL_OVERRIDES,
 	});
 `);

@@ -338,25 +338,25 @@ const gray = { r: 128, g: 128, b: 128 }
 expect(getContrastRatio(gray, gray)).toBe(1)
 
 // Relative luminance of pure colors
-expect(getRelativeLuminance(255, 0, 0)).toBeCloseTo(0.2126, 2) // Red
-expect(getRelativeLuminance(0, 255, 0)).toBeCloseTo(0.7152, 2) // Green
-expect(getRelativeLuminance(0, 0, 255)).toBeCloseTo(0.0722, 2) // Blue
+expect(getRelativeLuminance({r: 255, g: 0, b: 0})).toBeCloseTo(0.2126, 2) // Red
+expect(getRelativeLuminance({r: 0, g: 255, b: 0})).toBeCloseTo(0.7152, 2) // Green
+expect(getRelativeLuminance({r: 0, g: 0, b: 255})).toBeCloseTo(0.0722, 2) // Blue
 ```
 
 ### 6.3 Contrast Inversion Tests
 
 ```javascript
 // Force low contrast (dark color on dark bg)
-colorConfig.minLightness = 5
-colorConfig.maxLightness = 15
-colorConfig.contrastThreshold = 4.5
+siteConfig.minLightness = 5
+siteConfig.maxLightness = 15
+siteConfig.contrastThreshold = 4.5
 
 // Low lightness on dark bg = poor contrast ratio, should invert
 expect(styles.backgroundColor).toBeDefined()
 
 // Force high contrast (light color on dark bg)
-colorConfig.minLightness = 70
-colorConfig.maxLightness = 90
+siteConfig.minLightness = 70
+siteConfig.maxLightness = 90
 
 // High lightness on dark bg = good contrast ratio, should NOT invert
 expect(styles.backgroundColor).toBeUndefined()

@@ -39,12 +39,58 @@ function createSlider(opts) {
 	function update() {
 		thumbs.forEach((t, i) => t.style.left = toPercent(values[i]) + '%');
 		if (isRange) {
-			labels[0].textContent = `${values[0]}`;
-			labels[1].textContent = `${values[1]}`;
+			if (!labels[0].contains(document.activeElement)) labels[0].textContent = `${values[0]}`;
+			if (!labels[1].contains(document.activeElement)) labels[1].textContent = `${values[1]}`;
 		} else {
-			labels[0].textContent = `${values[0]}`;
+			if (!labels[0].contains(document.activeElement)) labels[0].textContent = `${values[0]}`;
 		}
 	}
+
+	// Click on label to edit value directly
+	function makeEditable(labelEl, index) {
+		labelEl.style.cursor = 'pointer';
+		labelEl.title = 'Click to edit';
+
+		labelEl.addEventListener('click', (e) => {
+			// Don't trigger if already editing
+			if (labelEl.querySelector('input')) return;
+
+			const currentValue = values[index];
+			const input = document.createElement('input');
+			input.type = 'number';
+			input.min = min;
+			input.max = max;
+			input.value = currentValue;
+			input.style.cssText = 'width: 4em; text-align: center; font-size: inherit; padding: 0 0.25em; background: var(--nc-bg); border: 1px solid var(--nc-border); color: var(--nc-fg);';
+
+			labelEl.textContent = '';
+			labelEl.appendChild(input);
+			input.focus();
+			input.select();
+
+			const finishEdit = () => {
+				let newValue = parseInt(input.value, 10);
+				if (isNaN(newValue)) newValue = currentValue;
+				newValue = Math.max(min, Math.min(max, newValue));
+				values[index] = newValue;
+				labelEl.textContent = `${newValue}`;
+				update();
+				onChange?.(isRange ? [...values] : values[0]);
+			};
+
+			input.addEventListener('blur', finishEdit);
+			input.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					input.blur();
+				} else if (e.key === 'Escape') {
+					labelEl.textContent = `${currentValue}`;
+				}
+			});
+		});
+	}
+
+	labels.forEach((label, i) => makeEditable(label, i));
 
 	function setGradient(hueStops) {
 		if (isRange) {

@@ -130,8 +130,9 @@ function parseColor(color, colorFormat = 'hsl')
 
 	let hslMatch, rgbMatch, hexMatch;
 	if(typeof color === 'string') {
-		hslMatch = color.match(/hsl\(([\d.]+),\s*([\d.]+)%?,\s*([\d.]+)%?\)/);
-		rgbMatch = color.match(/rgb\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\)/);
+		// Support both hsl/hsla and rgb/rgba formats (ignore alpha channel)
+		hslMatch = color.match(/hsla?\(([\d.]+),\s*([\d.]+)%?,\s*([\d.]+)%?(?:,\s*[\d.]+)?\)/);
+		rgbMatch = color.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*[\d.]+)?\)/);
 		hexMatch = color.match(/^#([a-f\d]{6}|[a-f\d]{3})$/i);
 	} else if(typeof color === 'object') {
 		if (color.h !== undefined && color.s !== undefined && color.l !== undefined)
@@ -145,8 +146,8 @@ function parseColor(color, colorFormat = 'hsl')
 
 	if(colorFormat === 'hsl') {
 		if (hslMatch)
-			return formatType === 'string' ? 
-			`hsl(${+hslMatch[1].toFixed(1)}, ${+hslMatch[2].toFixed(1)}%, ${+hslMatch[3].toFixed(1)}%)` : 
+			return formatType === 'string' ?
+			`hsl(${(+hslMatch[1]).toFixed(1)}, ${(+hslMatch[2]).toFixed(1)}%, ${(+hslMatch[3]).toFixed(1)}%)` :
 			{ h: +hslMatch[1], s: +hslMatch[2], l: +hslMatch[3] };
 		else if (rgbMatch){
 			const hsl = rgbToHsl(+rgbMatch[1], +rgbMatch[2], +rgbMatch[3]);
@@ -158,8 +159,8 @@ function parseColor(color, colorFormat = 'hsl')
 			return hexToHsl(color);
 	} else if(colorFormat === 'rgb') {
 		if (rgbMatch)
-			return formatType === 'string' ? 
-				`rgb(${+rgbMatch[1].toFixed(1)}, ${+rgbMatch[2].toFixed(1)}, ${+rgbMatch[3].toFixed(1)})` : 
+			return formatType === 'string' ?
+				`rgb(${(+rgbMatch[1]).toFixed(1)}, ${(+rgbMatch[2]).toFixed(1)}, ${(+rgbMatch[3]).toFixed(1)})` :
 				{ r: +rgbMatch[1], g: +rgbMatch[2], b: +rgbMatch[3] };
 		else if (hslMatch) {
 			const rgb = hslToRgb(+hslMatch[1], +hslMatch[2], +hslMatch[3]);
@@ -220,7 +221,9 @@ function getContrastRatio(color1, color2) {
 
 // Helper to get theme colors from preset by name
 function getPresetTheme(themeName) {
+	if (!themeName) themeName = siteThemeName;
 	if (!themeName) return null;
+
 	// Try exact match first, then case-insensitive
 	if (PRESET_THEMES[themeName]) return PRESET_THEMES[themeName];
 	const lowerName = themeName.toLowerCase();
@@ -232,14 +235,14 @@ function getPresetTheme(themeName) {
 
 // Get theme variables from 1. custom_theme 2. preset_theme 3. default
 // if colorFormat is specified, return colors in that format
-function getThemeVariables(colorFormat = null)
+function getThemeColors(themeName = null, colorFormat = null)
 {
 	const root = document.documentElement;
 	const style = getComputedStyle(root);
 
 	// Get preset theme from data-theme attribute
-	siteThemeName = root.dataset.theme || document.body?.dataset?.theme;
-	const presetTheme = siteThemeName ? getPresetTheme(siteThemeName) : null;
+	themeName = themeName ?? root.dataset.theme ?? document.body?.dataset?.theme;
+	const presetTheme = themeName ? getPresetTheme(themeName) : null;
 
 	// Map custom_theme keys to our keys (custom_theme uses different property names)
 	const customTheme = siteCustomTheme ? {
@@ -247,17 +250,11 @@ function getThemeVariables(colorFormat = null)
 		fg: siteCustomTheme.fg,
 		fgDim: siteCustomTheme.fgDim || siteCustomTheme.dim,
 		border: siteCustomTheme.border,
-		codeBg: siteCustomTheme.codeBg || siteCustomTheme.code_bg
+		codeBg: siteCustomTheme.codeBg || siteCustomTheme.code_bg,
 	} : null;
 
 	// Default fallbacks (used if no theme or theme missing property)
-	const defaults = {
-		bg: '#0a0a0a',
-		fg: '#e0e0e0',
-		fgDim: '#888888',
-		border: '#333333',
-		codeBg: '#222222'
-	};
+	const defaults = PRESET_THEMES['Full Spectrum'].colors;
 
 	// Helper to check if a color value is valid (not transparent, not empty)
 	function isValidColor(value) {
@@ -284,12 +281,27 @@ function getThemeVariables(colorFormat = null)
 		}
 
 		// 3. Try preset theme
-		if (presetTheme && isValidColor(presetTheme[themeKey])) {
-			return presetTheme[themeKey];
+		if (presetTheme && presetTheme.colors && isValidColor(presetTheme.colors[themeKey])) {
+			return presetTheme.colors[themeKey];
 		}
 
 		// 4. Fall back to defaults
 		return defaults[themeKey];
+	}
+
+	let invertedBg = getSafeColor('--color-fg', 'fg');
+	let invertedFg = getSafeColor('--color-bg', 'bg');
+
+	if(presetTheme?.logic)
+	{
+		const invertedContainerBg = presetTheme.logic.invertedContainerBg ?? 'fg';
+		const invertedContainerFg = presetTheme.logic.invertedContainerFg ?? 'bg';
+
+		const invertedContainerBgCss = '--color-' + toKebabCase(invertedContainerBg);
+		const invertedContainerFgCss = '--color-' + toKebabCase(invertedContainerFg);
+
+		invertedBg = getSafeColor(invertedContainerBgCss, invertedContainerBg);
+		invertedFg = getSafeColor(invertedContainerFgCss, invertedContainerFg);
 	}
 
 	const colors = {
@@ -298,6 +310,8 @@ function getThemeVariables(colorFormat = null)
 		fgDim: getSafeColor('--color-fg-dim', 'fgDim'),
 		border: getSafeColor('--color-border', 'border'),
 		codeBg: getSafeColor('--color-code-bg', 'codeBg'),
+
+		invertedBg, invertedFg,
 
 		error: '#ff6b6b',
 		warn: '#ffd93d',
@@ -398,6 +412,24 @@ function getThemeVariables(colorFormat = null)
 	return colors;
 }
 
+function getThemeDefaultSettings(themeName) 
+{
+	themeName = themeName ?? siteThemeName ?? 'Full Spectrum';
+	const presetTheme = getPresetTheme(themeName);
+	const themeColors = getThemeColors(themeName);
+	const themeColorVariables = getThemeColors(themeName, 'hsl');
+
+	return {
+		theme: themeName,
+		colors: themeColors,
+		colorVariables: themeColorVariables,
+		settings: {
+			...DEFAULT_SITE_CONFIG,
+			...presetTheme?.settings || {},
+		}
+	};
+}
+
 // Convert camelCase to kebab-case
 function toKebabCase(str) {
 	return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -405,7 +437,25 @@ function toKebabCase(str) {
 
 // Convert kebab-case to camelCase
 function toCamelCase(str) {
-	return str.replace(/-([a-z])/g, (match, p1) => p1.toUpperCase());
+	return str.replace(/-([a-z])/g, (_, p1) => p1.toUpperCase());
+}
+
+// Parse CSS text into style object
+function cssStringToStyles(cssText) {
+	const styles = {};
+	cssText.split(/[;\n]/).forEach(line => {
+		const trimmed = line.trim();
+		if (!trimmed) return;
+		const idx = trimmed.indexOf(':');
+		if (idx === -1) return;
+		const prop = trimmed.slice(0, idx).trim();
+		const value = trimmed.slice(idx + 1).trim();
+		if (prop && value) {
+			const camelProp = prop.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
+			styles[camelProp] = value;
+		}
+	});
+	return styles;
 }
 
 // Convert style object to CSS string
@@ -457,40 +507,6 @@ function mapColorToRange(color, effectiveConfig) {
 	return `hsl(${mappedHue}, ${mappedSat}%, ${mappedLit}%)`;
 }
 
-// Get background RGB from site theme or CSS variable
-function getBackgroundRgb() {
-	// Try site theme first
-	if (siteTheme && siteTheme.bg) {
-		const rgb = hexToRgb(siteTheme.bg);
-		if (rgb) return rgb;
-	}
-	// Try to get from CSS variable
-	const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim();
-	if (bgColor) {
-		const rgb = hexToRgb(bgColor);
-		if (rgb) return rgb;
-	}
-	// Default assumption: dark background (near black)
-	return { r: 10, g: 10, b: 10 };
-}
-
-// Get foreground RGB from site theme or CSS variable
-function getForegroundRgb() {
-	// Try site theme first
-	if (siteTheme && siteTheme.fg) {
-		const rgb = hexToRgb(siteTheme.fg);
-		if (rgb) return rgb;
-	}
-	// Try to get from CSS variable
-	const fgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-fg').trim();
-	if (fgColor) {
-		const rgb = hexToRgb(fgColor);
-		if (rgb) return rgb;
-	}
-	// Default assumption: light foreground
-	return { r: 224, g: 224, b: 224 };
-}
-
 // Adjust background lightness to meet contrast threshold with text color
 function adjustBgForContrast(bgRgb, textRgb, threshold = 4.5) {
 	let contrast = getContrastRatio(bgRgb, textRgb);
@@ -521,29 +537,17 @@ function adjustBgForContrast(bgRgb, textRgb, threshold = 4.5) {
 	return `hsl(${bgHsl.h.toFixed(0)}, ${bgHsl.s.toFixed(0)}%, ${newL.toFixed(0)}%)`;
 }
 
-function pickBestContrastingColor(color, colorFormat = 'hsl', invertedContainer = false)
+function pickBestContrastingColor(color, colorFormat = 'hsl', options = {})
 {
-	let bgColor = siteTheme.bg;
-	let fgColor = siteTheme.fg;
+	options = {
+		themeName: siteThemeName,
+		isInverted: false,
+		...options
+	};
 
-	const presetTheme = siteThemeName ? getPresetTheme(siteThemeName) : null;
-
-	//check for background logic overrides, see: poetry
-	if(invertedContainer && presetTheme.logic && presetTheme.logic.invertedContainerBg) {
-		let invertedContainerBg = presetTheme.logic.invertedContainerBg;
-		if(siteTheme[invertedContainerBg])
-			invertedContainerBg = siteTheme[invertedContainerBg];
-
-		bgColor = invertedContainerBg;
-	}
-
-	if(invertedContainer && presetTheme.logic && presetTheme.logic.invertedContainerFg) {
-		let invertedContainerFg = presetTheme.logic.invertedContainerFg;
-		if(siteTheme[invertedContainerFg])
-			invertedContainerFg = siteTheme[invertedContainerFg];
-
-		fgColor = invertedContainerFg;
-	}
+	const themeVariables = getThemeColors(options.themeName, 'hsl');
+	let bgColor = options.isInverted ? themeVariables.invertedBg : themeVariables.bg;
+	let fgColor = options.isInverted ? themeVariables.invertedFg : themeVariables.fg;
 
 	let bgContrast = getContrastRatio(bgColor, color);
 	let fgContrast = getContrastRatio(fgColor, color);
@@ -561,8 +565,18 @@ function adjustContrastToThreshold(colorCompare, colorAdjust, threshold = 4.5, c
 
 	const hslCompare = parseColor(colorCompare, 'hsl');
 	const hslAdjust = parseColor(colorAdjust, 'hsl');
+
+	// If either color can't be parsed, return early with original colors
+	if (!hslCompare || !hslAdjust) {
+		colors.colorAdjust = colorAdjust;
+		colors.colorCompare = colorCompare;
+		colors.contrast = contrast;
+		colors.loopCount = 0;
+		return colors;
+	}
+
 	let loopCount = 0;
-	
+
 	while(contrast < threshold && loopCount < 20)
 	{
 		const luminanceCompare = getRelativeLuminance(hslCompare);
@@ -601,39 +615,47 @@ function adjustContrastToThreshold(colorCompare, colorAdjust, threshold = 4.5, c
 }
 
 // Apply range mapping to a color based on config
-function applyRangeMappingToColor(color, config, colorFormat = 'hsl', mapHue = true, mapSat = true, mapLit = true)
+function applyRangeMappingToColor(color, colorFormat = 'hsl', options = {})
 {
+	options = {
+		mapHue: true,
+		mapSat: true,
+		mapLit: true,
+		effectiveConfig: getEffectiveSiteConfig(),
+		...options
+	}
+
 	if(!color) return null;
 
 	const hsl = parseColor(color, 'hsl');
 	if(!hsl) return null;
 
-	const h = mapHue ? mapHueToRange(hsl.h, config.minHue, config.maxHue) : hsl.h;
-	const s = mapSat ? mapToRange(hsl.s, config.minSaturation, config.maxSaturation) : hsl.s;
-	const l = mapLit ? mapToRange(hsl.l, config.minLightness, config.maxLightness) : hsl.l;
+	const h = options.mapHue ? mapHueToRange(hsl.h, options.effectiveConfig.minHue ?? 0, options.effectiveConfig.maxHue ?? 360) : hsl.h;
+	const s = options.mapSat ? mapToRange(hsl.s, options.effectiveConfig.minSaturation ?? 0, options.effectiveConfig.maxSaturation ?? 100) : hsl.s;
+	const l = options.mapLit ? mapToRange(hsl.l, options.effectiveConfig.minLightness ?? 0, options.effectiveConfig.maxLightness ?? 100) : hsl.l;
 
 	return parseColor({ h, s, l }, colorFormat);
 }
 
-// Function to get effective color config (applies site theme overrides)
-function getEffectiveColorConfig() {
-	const config = { ...colorConfig };
+// Function to get effective site config (applies site theme overrides)
+function getEffectiveSiteConfig() {
+	const config = { ...siteConfig };
+	const themeColors = getThemeColors(null, 'hsl');
+	const siteThemeFgHSL = parseColor(themeColors?.fg, 'hsl') || { h: 0, s: 0, l: 0 };
 
-	if (siteThemeFgHSL) {
-		if (siteThemeConfig.useHueRange) {
-			config.minHue = (siteThemeFgHSL.h - siteThemeConfig.hueSpread + 360) % 360;
-			config.maxHue = (siteThemeFgHSL.h + siteThemeConfig.hueSpread) % 360;
-		}
-		if (siteThemeConfig.useSaturation) {
-			const spread = siteThemeConfig.saturationSpread || 0;
-			config.minSaturation = Math.max(0, siteThemeFgHSL.s - spread);
-			config.maxSaturation = Math.min(100, siteThemeFgHSL.s + spread);
-		}
-		if (siteThemeConfig.useLightness) {
-			const spread = siteThemeConfig.lightnessSpread || 0;
-			config.minLightness = Math.max(0, siteThemeFgHSL.l - spread);
-			config.maxLightness = Math.min(100, siteThemeFgHSL.l + spread);
-		}
+	if (siteConfig.useSiteThemeHue) {
+		config.minHue = (siteThemeFgHSL.h - siteConfig.hueSpread + 360) % 360;
+		config.maxHue = (siteThemeFgHSL.h + siteConfig.hueSpread) % 360;
+	}
+	if (siteConfig.useSiteThemeSat) {
+		const spread = siteConfig.satSpread || 0;
+		config.minSaturation = Math.max(0, siteThemeFgHSL.s - spread);
+		config.maxSaturation = Math.min(100, siteThemeFgHSL.s + spread);
+	}
+	if (siteConfig.useSiteThemeLit) {
+		const spread = siteConfig.litSpread || 0;
+		config.minLightness = Math.max(0, siteThemeFgHSL.l - spread);
+		config.maxLightness = Math.min(100, siteThemeFgHSL.l + spread);
 	}
 
 	return config;
@@ -653,9 +675,9 @@ function hashString(str) {
 // Initialize our safe CSS variables that handle transparent values
 // Sets --nc-* variables on :root with safe fallbacks from current theme
 // Priority: CSS var (if valid) > custom_theme (siteTheme) > PRESET_THEMES > defaults
-function initCssVariables() {
+function initCssVariables(themeName = null) {
 	
-	const colors = getThemeVariables();
+	const colors = getThemeColors(themeName);
 	const root = document.documentElement;
 
 	root.style.setProperty('--nc-bg', colors.bg);
@@ -663,6 +685,8 @@ function initCssVariables() {
 	root.style.setProperty('--nc-fg-dim', colors.fgDim);
 	root.style.setProperty('--nc-border', colors.border);
 	root.style.setProperty('--nc-code-bg', colors.codeBg);
+	root.style.setProperty('--nc-inverted-bg', colors.invertedBg);
+	root.style.setProperty('--nc-inverted-fg', colors.invertedFg);
 	root.style.setProperty('--nc-error', colors.error);
 	root.style.setProperty('--nc-warn', colors.warn);
 	root.style.setProperty('--nc-success', colors.success);
