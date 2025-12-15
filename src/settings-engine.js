@@ -436,9 +436,11 @@ function createSettingsEngine(opts) {
 
 		wrapper.appendChild(section);
 
-		// Add hr after section
-		const hr = document.createElement('hr');
-		wrapper.appendChild(hr);
+		// Add hr after section (unless noHr is set)
+		if (!def.noHr) {
+			const hr = document.createElement('hr');
+			wrapper.appendChild(hr);
+		}
 
 		parentEl.appendChild(wrapper);
 

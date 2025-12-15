@@ -208,7 +208,7 @@ function createSettingsPanel()
 				}},
 		]},
 
-		{ type: 'section', label: 'Debug', fields: [
+		{ type: 'section', label: 'Debug', noHr: true, fields: [
 			{ key: 'debugMode', type: 'toggle', label: 'Enable debug mode', default: DEBUG,
 				onChange: (value) => {
 					DEBUG = value;
@@ -356,6 +356,11 @@ function createSettingsPanel()
 			hueSingle.setGradient?.(fullHueStops);
 			satSingle.setGradient?.([[h, 0, l, 1, 0], [h, 100, l, 1, 100]]);
 			litSingle.setGradient?.([[h, s, 0, 1, 0], [h, s, 50, 1, 50], [h, s, 100, 1, 100]]);
+
+			// Single slider thumb colors
+			hueSingle.setThumbColor?.(`hsl(${h}, ${s}%, ${l}%)`);
+			satSingle.setThumbColor?.(`hsl(${h}, ${s}%, ${l}%)`);
+			litSingle.setThumbColor?.(`hsl(${h}, ${s}%, ${l}%)`);
 		}
 
 		// Update slider disabled states
@@ -390,11 +395,14 @@ function createSettingsPanel()
 	function updatePreview() {
 		updateGradients();
 		const effConfig = getEffective();
+		// Use selected preset theme for preview, or fall back to site theme
+		const previewTheme = presetSelect.value || siteThemeName || '';
 
 		previewRow.querySelectorAll('.preview-nick').forEach((el, i) => {
 			const username = previewNames[i];
 			applyStyles(el, username, {
 				effectiveConfig: effConfig,
+				themeName: previewTheme,
 				isInverted: false,
 				debugData: DEBUG
 			});
@@ -405,6 +413,7 @@ function createSettingsPanel()
 			const username = previewNames[i];
 			applyStyles(el, username, {
 				effectiveConfig: effConfig,
+				themeName: previewTheme,
 				isInverted: true,
 				debugData: DEBUG
 			});

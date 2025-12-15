@@ -86,12 +86,13 @@ const script = new Function(code + `
 		getRelativeLuminance,
 		getContrastRatio,
 		toKebabCase,
+		toCamelCase,
 		stylesToCssString,
 		parseColor,
+		getColorFormat,
 		mapHueToRange,
 		mapToRange,
 		mapColorToRange,
-		adjustBgForContrast,
 		adjustContrastToThreshold,
 		pickBestContrastingColor,
 		applyRangeMappingToColor,
@@ -115,7 +116,6 @@ const script = new Function(code + `
 		generateStyles,
 		getHashBasedIcon,
 		getHashBasedStyleVariations,
-		getIconsForUsername,
 		applyStyles,
 
 		// Nick functions

@@ -289,7 +289,7 @@ function generateStyles(username, options = {})
 
 	let debugData = [];
 
-	const threshold = options.effectiveConfig.contrastThreshold || 4.5;
+	const threshold = options.effectiveConfig.contrastThreshold ?? 4.5;
 	const nickStyles = getMappedNickColor(username, 'hsl', {
 		includeStyles: true,
 		effectiveConfig: options.effectiveConfig,
@@ -334,8 +334,11 @@ function generateStyles(username, options = {})
 	const nickFg = parseColor(nickStyles.color, 'hsl-string');
 	const nickBg = nickStyles.backgroundColor ? parseColor(nickStyles.backgroundColor, 'hsl-string') : null;
 
+	// Extract icon values before makeStylesObject deletes them
+	const prependIcon = nickStyles.prependIcon;
+	const appendIcon = nickStyles.appendIcon;
+
 	const styles = makeStylesObject(nickStyles);
-	styles.padding = '0 0.25rem';
 	styles.color = nickFg;
 
 	// if we should invert, swap fg and bg
@@ -365,6 +368,7 @@ function generateStyles(username, options = {})
 		debugData.push(['Nick BG (adj)', styles.backgroundColor || 'N/A']);
 
 		contrastRatio = getContrastRatio(styles.color, styles.backgroundColor);
+		styles.padding = '0 0.25em';
 	}
 	else
 	{
@@ -380,46 +384,10 @@ function generateStyles(username, options = {})
 
 	debugData.push(['Contrast (adj)', +contrastRatio.toFixed(2)]);
 
-	return { 
-		styles, 
-		nickConfig: nickStyles,
-		debugData
-	};
-}
-
-/**
- * Get icons for a username
- * @returns {{ prepend: string|null, append: string|null }}
- */
-function getIconsForUsername(username) {
-	const saved = customNickColors[username] || {};
-	const override = MANUAL_OVERRIDES[username] || {};
-
-	// Check if user has custom icon settings
-	const hasCustomIcons = 'prependIcon' in saved || 'appendIcon' in saved;
-	const hasOverrideIcons = 'prependIcon' in override || 'appendIcon' in override;
-
-	if (hasCustomIcons) {
-		// User has explicit icon settings - use them (empty string means disabled)
-		return {
-			prepend: saved.prependIcon || null,
-			append: saved.appendIcon || null
-		};
-	}
-
-	if (hasOverrideIcons) {
-		// Remote override has icon settings
-		return {
-			prepend: override.prependIcon || null,
-			append: override.appendIcon || null
-		};
-	}
-
-	// Fall back to hash-based icon if enabled globally
-	const hashIcon = getHashBasedIcon(username, { effectiveConfig: options.effectiveConfig });
 	return {
-		prepend: (options.effectiveConfig.prependIcon && hashIcon) ? hashIcon : null,
-		append: (options.effectiveConfig.appendIcon && hashIcon) ? hashIcon : null
+		styles,
+		nickConfig: { ...nickStyles, prependIcon, appendIcon },
+		debugData
 	};
 }
 
@@ -468,6 +436,10 @@ function applyStyles(element, username, options = {})
 		}
 		delete styles.data;
 	}
+
+	// Clear previous inline styles before applying new ones
+	// This ensures old background-color/padding from inversion is removed when no longer needed
+	element.style.cssText = '';
 
 	// Apply all styles to the element
 	for(const key in styles)

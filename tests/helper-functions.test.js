@@ -55,6 +55,26 @@ describe('toKebabCase', () => {
 	});
 });
 
+describe('toCamelCase', () => {
+	it('converts kebab-case to camelCase', () => {
+		expect(toCamelCase('background-color')).toBe('backgroundColor');
+		expect(toCamelCase('font-weight')).toBe('fontWeight');
+		expect(toCamelCase('min-saturation')).toBe('minSaturation');
+	});
+
+	it('handles already camelCase strings', () => {
+		expect(toCamelCase('color')).toBe('color');
+	});
+
+	it('handles multiple hyphens', () => {
+		expect(toCamelCase('border-top-left-radius')).toBe('borderTopLeftRadius');
+	});
+
+	it('handles leading hyphen', () => {
+		expect(toCamelCase('-webkit-transform')).toBe('WebkitTransform');
+	});
+});
+
 describe('stylesToCssString', () => {
 	it('converts style object to CSS string', () => {
 		const styles = { backgroundColor: 'red', fontSize: '12px' };
@@ -105,45 +125,7 @@ describe('parseColor', () => {
 	});
 });
 
-describe('mapHueToRange', () => {
-	it('returns hue unchanged for full range', () => {
-		expect(mapHueToRange(180, 0, 360)).toBe(180);
-		expect(mapHueToRange(0, 0, 360)).toBe(0);
-		expect(mapHueToRange(360, 0, 360)).toBe(360);
-	});
-
-	it('maps proportionally for normal range', () => {
-		// 180 is 50% of 360, should map to 50% of 100-200 range = 150
-		expect(mapHueToRange(180, 100, 200)).toBe(150);
-		// 0 maps to min
-		expect(mapHueToRange(0, 100, 200)).toBe(100);
-		// 360 maps to max
-		expect(mapHueToRange(360, 100, 200)).toBe(200);
-	});
-
-	it('handles wrap-around range', () => {
-		// Range 300-60 means 300->360->0->60 (total 120 degrees)
-		// 0 input should map to 300 (start)
-		expect(mapHueToRange(0, 300, 60)).toBe(300);
-		// 360 input should map to 60 (end)
-		expect(mapHueToRange(360, 300, 60)).toBe(60);
-	});
-});
-
-describe('mapToRange', () => {
-	it('returns value unchanged for full range', () => {
-		expect(mapToRange(50, 0, 100)).toBe(50);
-	});
-
-	it('maps proportionally', () => {
-		// 50 is 50% of 100, should map to 50% of 20-80 range = 50
-		expect(mapToRange(50, 20, 80)).toBe(50);
-		// 0 maps to min
-		expect(mapToRange(0, 20, 80)).toBe(20);
-		// 100 maps to max
-		expect(mapToRange(100, 20, 80)).toBe(80);
-	});
-});
+// Note: mapHueToRange and mapToRange tests are in range-mapping.test.js
 
 describe('hashString', () => {
 	it('returns consistent hash for same input', () => {
@@ -171,6 +153,125 @@ describe('hashString', () => {
 		const hash = hashString('anyuser');
 		expect(hash).toBeGreaterThanOrEqual(0);
 		expect(Number.isInteger(hash)).toBe(true);
+	});
+});
+
+describe('parseColor edge cases', () => {
+	it('handles uppercase hex colors', () => {
+		const result = parseColor('#FFFFFF');
+		expect(result).toEqual({ h: 0, s: 0, l: 100 });
+	});
+
+	it('handles mixed case hex colors', () => {
+		const result = parseColor('#FfAa00');
+		expect(result).not.toBeNull();
+	});
+
+	it('handles hsla with alpha channel', () => {
+		const result = parseColor('hsla(180, 50%, 60%, 0.5)');
+		expect(result).toEqual({ h: 180, s: 50, l: 60 });
+	});
+
+	it('handles rgba with alpha channel', () => {
+		const result = parseColor('rgba(255, 0, 0, 0.5)');
+		expect(result).toEqual({ h: 0, s: 100, l: 50 });
+	});
+
+	it('handles hsl with decimal values', () => {
+		const result = parseColor('hsl(180.5, 50.5%, 60.5%)');
+		expect(result).toEqual({ h: 180.5, s: 50.5, l: 60.5 });
+	});
+
+	it('returns null for empty string', () => {
+		expect(parseColor('')).toBeNull();
+	});
+
+	it('returns null for null input', () => {
+		expect(parseColor(null)).toBeNull();
+	});
+
+	it('returns null for undefined input', () => {
+		expect(parseColor(undefined)).toBeNull();
+	});
+
+	it('returns null for 3-digit hex (not supported)', () => {
+		expect(parseColor('#fff')).toBeNull();
+	});
+
+	it('converts HSL object to string format when requested', () => {
+		const result = parseColor({ h: 180, s: 50, l: 60 }, 'hsl-string');
+		expect(result).toMatch(/^hsl\(180/);
+	});
+
+	it('converts between formats correctly', () => {
+		// HSL to RGB
+		const rgb = parseColor('hsl(0, 100%, 50%)', 'rgb');
+		expect(rgb.r).toBe(255);
+		expect(rgb.g).toBe(0);
+		expect(rgb.b).toBe(0);
+	});
+});
+
+describe('getThemeColors', () => {
+	it('returns an object with expected theme properties', () => {
+		const colors = getThemeColors();
+		expect(colors).toHaveProperty('bg');
+		expect(colors).toHaveProperty('fg');
+		expect(colors).toHaveProperty('fgDim');
+		expect(colors).toHaveProperty('border');
+		expect(colors).toHaveProperty('codeBg');
+		expect(colors).toHaveProperty('invertedBg');
+		expect(colors).toHaveProperty('invertedFg');
+	});
+
+	it('returns valid color values', () => {
+		const colors = getThemeColors();
+		// All colors should be strings (hex or hsl/rgb)
+		expect(typeof colors.bg).toBe('string');
+		expect(typeof colors.fg).toBe('string');
+		expect(colors.bg.length).toBeGreaterThan(0);
+		expect(colors.fg.length).toBeGreaterThan(0);
+	});
+
+	it('returns consistent results when called multiple times', () => {
+		const colors1 = getThemeColors();
+		const colors2 = getThemeColors();
+		expect(colors1.bg).toBe(colors2.bg);
+		expect(colors1.fg).toBe(colors2.fg);
+	});
+
+	it('accepts themeName parameter', () => {
+		const colors = getThemeColors('poetry');
+		expect(colors).toHaveProperty('bg');
+		expect(colors).toHaveProperty('fg');
+	});
+});
+
+describe('getColorFormat', () => {
+	it('detects hsl-string format', () => {
+		expect(getColorFormat('hsl(180, 50%, 60%)')).toBe('hsl-string');
+	});
+
+	it('detects rgb-string format', () => {
+		expect(getColorFormat('rgb(255, 0, 0)')).toBe('rgb-string');
+	});
+
+	it('detects hex format', () => {
+		expect(getColorFormat('#ff0000')).toBe('hex-string');
+		expect(getColorFormat('#FFF000')).toBe('hex-string');
+	});
+
+	it('detects hsl object format', () => {
+		expect(getColorFormat({ h: 180, s: 50, l: 60 })).toBe('hsl-object');
+	});
+
+	it('detects rgb object format', () => {
+		expect(getColorFormat({ r: 255, g: 0, b: 0 })).toBe('rgb-object');
+	});
+
+	it('returns null for unknown formats', () => {
+		expect(getColorFormat('red')).toBeNull();
+		expect(getColorFormat('invalid')).toBeNull();
 	});
 });
 

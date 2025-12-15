@@ -397,6 +397,28 @@ function getThemeColors(themeName = null, colorFormat = null)
 		colors.warnBg = `hsl(45, ${sat}%, ${lit}%)`;
 		colors.successBg = `hsl(120, ${sat}%, ${lit}%)`;
 		colors.infoBg = `hsl(210, ${sat}%, ${lit}%)`;
+
+		// Ensure alert fg/bg pairs have good contrast
+		if (colors.error && colors.errorBg) {
+			const adjusted = adjustContrastToThreshold(colors.errorBg, colors.error, 4.5, 'hsl-string');
+			colors.error = adjusted.colorAdjust;
+			colors.errorBg = adjusted.colorCompare;
+		}
+		if (colors.warn && colors.warnBg) {
+			const adjusted = adjustContrastToThreshold(colors.warnBg, colors.warn, 4.5, 'hsl-string');
+			colors.warn = adjusted.colorAdjust;
+			colors.warnBg = adjusted.colorCompare;
+		}
+		if (colors.success && colors.successBg) {
+			const adjusted = adjustContrastToThreshold(colors.successBg, colors.success, 4.5, 'hsl-string');
+			colors.success = adjusted.colorAdjust;
+			colors.successBg = adjusted.colorCompare;
+		}
+		if (colors.info && colors.infoBg) {
+			const adjusted = adjustContrastToThreshold(colors.infoBg, colors.info, 4.5, 'hsl-string');
+			colors.info = adjusted.colorAdjust;
+			colors.infoBg = adjusted.colorCompare;
+		}
 	}
 
 	if(colorFormat)
@@ -505,36 +527,6 @@ function mapColorToRange(color, effectiveConfig) {
 	const mappedLit = mapToRange(hsl.l, effectiveConfig.minLightness, effectiveConfig.maxLightness);
 
 	return `hsl(${mappedHue}, ${mappedSat}%, ${mappedLit}%)`;
-}
-
-// Adjust background lightness to meet contrast threshold with text color
-function adjustBgForContrast(bgRgb, textRgb, threshold = 4.5) {
-	let contrast = getContrastRatio(bgRgb, textRgb);
-	if (contrast >= threshold) {
-		return null; // No adjustment needed
-	}
-
-	const bgHsl = rgbToHsl(bgRgb.r, bgRgb.g, bgRgb.b);
-	const textLuminance = getRelativeLuminance(textRgb);
-
-	// Determine direction: darken if text is light, lighten if text is dark
-	const step = textLuminance > 0.5 ? -5 : 5;
-	let newL = bgHsl.l;
-
-	// Adjust lightness until we meet threshold or hit limits
-	for (let i = 0; i < 20; i++) {
-		newL += step;
-		if (newL < 5 || newL > 95) break;
-
-		const adjusted = hslToRgb(bgHsl.h, bgHsl.s, newL);
-		contrast = getContrastRatio(adjusted, textRgb);
-		if (contrast >= threshold) {
-			return `hsl(${bgHsl.h.toFixed(0)}, ${bgHsl.s.toFixed(0)}%, ${newL.toFixed(0)}%)`;
-		}
-	}
-
-	// If we couldn't meet threshold, return the most extreme adjustment
-	return `hsl(${bgHsl.h.toFixed(0)}, ${bgHsl.s.toFixed(0)}%, ${newL.toFixed(0)}%)`;
 }
 
 function pickBestContrastingColor(color, colorFormat = 'hsl', options = {})

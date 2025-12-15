@@ -88,7 +88,7 @@ function createUserSettingsPanel(username, currentStyles)
 		title: `Nick: ${username}`,
 		width: '350px',
 		onSettings: () => createSettingsPanel(),
-		preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message in cIRC<br />Inline mention in plain text <span id="picker-preview-mention">@${username}</span> example</div>
+		preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message in cIRC<br />Inline mention <span id="picker-preview-mention">@${username}</span> example</div>
 			<div class="preview preview-inverted" id="picker-preview-inverted">&lt;<span id="picker-preview-inverted-nick">${username}</span>&gt; Inverted container preview</div>`,
 		content: `
 			${createDebugPre({
@@ -260,7 +260,7 @@ function createUserSettingsPanel(username, currentStyles)
 				});
 			}},
 		]},
-		{ type: 'section', label: 'Request Override', hint: 'If you want your nickname to show up the same for everyone using the Nick Colors script, you can request an override. If the button below doesn\'t work, you can click \'Copy to Clipboard\' above, and send it manually to <a href="/z0ylent">@z0ylent</a>.', fields: [
+		{ type: 'section', label: 'Request Override', noHr: true, hint: 'If you want your nickname to show up the same for everyone using the Nick Colors script, you can request an override. If the button below doesn\'t work, you can click \'Copy to Clipboard\' above, and send it manually to <a href="/z0ylent">@z0ylent</a>.', fields: [
 			{ key: 'requestOverride', type: 'button', label: 'Message @z0ylent to request override', buttonText: 'Request Override', onClick: () => {
 				const exportData = { [username]: buildCurrentStyles() };
 				const message = `Hi! I'd like to request a site-wide nick color override: ${JSON.stringify(minifyKeys(exportData))}`;

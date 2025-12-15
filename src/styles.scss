@@ -32,6 +32,39 @@
 	display: flex;
 	flex-direction: column;
 
+	::-webkit-scrollbar-track {
+		background: var(--nc-code-bg);
+		border-radius: 0px;
+		border: none;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: var(--nc-bg);
+		opacity: 0.5;
+		border-radius: 0px;
+		border: none;
+		box-shadow: none;
+		&:hover {
+			opacity: 0.75;
+		}
+		&:active {
+			opacity: 1;
+		}
+	}
+
+	::-webkit-scrollbar-corner {
+		background: var(--nc-bg);
+	}
+
+	::-webkit-scrollbar-button {
+		background: var(--nc-bg);
+	}
+
+	* {
+		scrollbar-width: auto;
+		scrollbar-color: var(--nc-bg) var(--nc-code-bg);
+	}
+
 	.spacer {
 		flex: 1;
 	}
@@ -46,7 +79,7 @@
 	}
 
 	h4 {
-		margin: 0.5rem 0;
+		margin: var(--spacing-xs) 0;
 		color: var(--nc-fg);
 		font-size: var(--font-size-base, 1rem);
 		text-transform: uppercase;
@@ -68,15 +101,15 @@
 	// Input rows
 	.nc-input-row,
 	.nc-input-row-stacked {
-		padding: 0.5rem 0;
+		padding: var(--spacing-xs) 0;
 		display: flex;
 		flex-direction: row;
-		gap: 0.5rem;
+		gap: var(--spacing-sm);
 	}
 
 	.nc-input-row-stacked {
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: var(--spacing-xs);
 	}
 
 	.nc-input-row.no-padding-bottom,
@@ -103,13 +136,13 @@
 	// Buttons
 	.buttons {
 		display: flex;
-		gap: 0.5rem;
+		gap: var(--spacing-sm);
 		justify-content: flex-end;
 	}
 
 	button {
 		flex: 1 0 auto;
-		padding: 0.5rem;
+		padding: var(--spacing-sm);
 
 		&:hover {
 			border-color: var(--nc-fg-dim);
@@ -121,6 +154,7 @@
 			padding: 0;
 			color: var(--nc-fg-dim);
 			flex: 0 0 auto;
+			text-transform: uppercase;
 
 			&:hover {
 				border-color: var(--nc-fg);
@@ -157,7 +191,7 @@
 	textarea,
 	select {
 		width: 100%;
-		padding: 0.5rem;
+		padding: var(--spacing-xs) var(--spacing-sm);
 		background: var(--nc-bg);
 		border: 1px solid var(--nc-border);
 		color: var(--nc-fg);
@@ -174,7 +208,7 @@
 	// Toggle component
 	.nc-toggle {
 		display: flex;
-		margin: 0.5rem 0;
+		margin: var(--spacing-xs) 0;
 	}
 
 	.nc-toggle-label {
@@ -252,44 +286,70 @@
 	.nc-dialog-attribution {
 		width: 100%;
 		display: flex;
-		justify-content: flex-end;
-		gap: 0.5rem;
+		justify-content: right;
+		gap: var(--spacing-xs);
 		border-top: 1px dotted var(--nc-border);
-		margin-top: 0.3rem;
+		margin-top: var(--spacing-xs);
+		padding-top: var(--spacing-xs);
 		font-size: calc(var(--font-size-base) * 0.875);
+		line-height: calc(var(--font-size-base) * 0.875);
 		color: var(--nc-fg-dim);
-		padding-top: 0.3rem;
+
+		> span 
+		{
+			flex: 0 0 auto;
+			border-right: 1px solid var(--nc-border);
+			padding-right: var(--spacing-xs);
+			margin-right: var(--spacing-xs);
+
+			&:last-child 
+			{
+				border-right: none;
+				padding-right: 0;
+				margin-right: 0;
+			}
+		}
 
 		a {
 			color: var(--nc-fg-dim);
 			text-decoration: none;
+
+			&.github-link 
+			{
+				height: calc(var(--font-size-base) * 0.875);
+			}
 		}
+	}
+
+	.nc-dialog-error,
+	.nc-dialog-warning,
+	.nc-dialog-success,
+	.nc-dialog-info {
+		font-size: calc(var(--font-size-base) * 0.875);
+		line-height: calc(var(--line-height-base) * 0.875);
+		padding: var(--spacing-xs) var(--spacing-sm);
 	}
 
 	// Alert boxes
 	.nc-dialog-error {
-		font-size: calc(var(--font-size-base) * 0.875);
 		color: var(--nc-error);
 		background-color: var(--nc-error-bg);
 		border: 1px dashed var(--nc-error);
 	}
 
 	.nc-dialog-warning {
-		font-size: calc(var(--font-size-base) * 0.875);
 		color: var(--nc-warn);
 		background-color: var(--nc-warn-bg);
 		border: 1px dashed var(--nc-warn);
 	}
 
 	.nc-dialog-success {
-		font-size: calc(var(--font-size-base) * 0.875);
 		color: var(--nc-success);
 		background-color: var(--nc-success-bg);
 		border: 1px dashed var(--nc-success);
 	}
 
 	.nc-dialog-info {
-		font-size: calc(var(--font-size-base) * 0.875);
 		color: var(--nc-info);
 		background-color: var(--nc-info-bg);
 		border: 1px dashed var(--nc-info);
@@ -317,7 +377,7 @@
 	}
 
 	.nc-gap-2 {
-		gap: 0.5rem;
+		gap: var(--spacing-sm);
 	}
 
 	.nc-gap-3 {
@@ -339,7 +399,7 @@
 		background-color: var(--nc-code-bg);
 		color: var(--nc-fg);
 		font-size: calc(var(--font-size-base) * 0.875);
-		padding: 0.5rem;
+		padding: var(--spacing-xs) var(--spacing-sm);
 		border: 2px dashed var(--nc-border);
 	}
 
@@ -352,7 +412,8 @@
 	div.nc-dialog-debug {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacing-xs);
+		margin-bottom: var(--spacing-xs);
 
 		> span {
 			display: flex;
@@ -385,37 +446,39 @@
 
 // Dialog sections
 .nc-dialog-header {
-	padding: 1rem 1rem 0.5rem;
+	padding: var(--spacing-sm);
 	border-bottom: 1px solid var(--nc-border);
 	flex-shrink: 0;
 	width: 100%;
 	box-sizing: border-box;
-	gap: 0.5rem;
+	gap: var(--spacing-sm);
 }
 
 .nc-dialog-content {
-	padding: 0.5rem 1rem;
+	padding: var(--spacing-sm);
 	overflow-y: auto;
 	flex: 1;
 }
 
 .nc-dialog-preview 
 {
-	padding: 0.5rem 1rem;
+	padding: var(--spacing-xs) var(--spacing-sm);
 	border-bottom: 1px solid var(--nc-border);
 	flex-shrink: 0;
 	background: var(--nc-code-bg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-xs);
 
 	.preview,
 	.preview-row {
 		font-size: var(--font-size-base);
-		line-height: var(--font-size-base);
+		line-height: var(--line-height-base);
 		margin: 0;
 		border: 1px solid var(--nc-border);
-		padding: 0.25rem;
-		margin: 0.5rem 0;
+		padding: var(--spacing-xs) var(--spacing-sm);
 		background: var(--nc-bg);
-		max-height: 3.1rem;
+		max-height: calc((var(--font-size-h) * 2 * var(--line-height-base)) + (var(--spacing-xs) * 2));
 		overflow: hidden;
 
 		&.preview-inverted
@@ -439,7 +502,7 @@
 }
 
 .nc-dialog-footer {
-	padding: 0.5rem 1rem 0.5rem;
+	padding: var(--spacing-sm);
 	border-top: 1px solid var(--nc-border);
 	flex-shrink: 0;
 }
@@ -540,7 +603,7 @@
 	justify-content: space-between;
 	font-size: calc(var(--font-size-base, 1rem) * 0.625);
 	line-height: calc(var(--font-size-base, 1rem) * 0.625);
-	margin-bottom: 0.5rem;
+	margin-bottom: var(--spacing-sm);
 
 	&,
 	span {
@@ -571,7 +634,7 @@
 
 .nc-debug-row {
 	display: flex;
-	gap: 0.5rem;
+	gap: var(--spacing-sm);
 	padding: 0.125rem 0;
 	border-bottom: 1px dotted var(--nc-border, #333);
 
@@ -607,7 +670,8 @@
 
 /* Add a bit of extra theme styling */
 
-html[data-theme="poetry"]
+html[data-theme="poetry"],
+body[data-theme="poetry"]
 {
 	[data-mention-colored="true"],
 	[data-nick-colored="true"]
