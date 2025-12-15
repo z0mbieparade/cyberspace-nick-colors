@@ -15,9 +15,9 @@ describe('minifyKeys', () => {
 	});
 
 	it('handles nested objects', () => {
-		const input = { colorConfig: { minHue: 0, maxHue: 360 } };
+		const input = { siteConfig: { minHue: 0, maxHue: 360 } };
 		const result = minifyKeys(input);
-		expect(result).toEqual({ cc: { mH: 0, xH: 360 } });
+		expect(result).toEqual({ sc: { mH: 0, xH: 360 } });
 	});
 
 	it('handles arrays', () => {
@@ -47,9 +47,9 @@ describe('maxifyKeys', () => {
 	});
 
 	it('handles nested objects', () => {
-		const input = { cc: { mH: 0, xH: 360 } };
+		const input = { sc: { mH: 0, xH: 360 } };
 		const result = maxifyKeys(input);
-		expect(result).toEqual({ colorConfig: { minHue: 0, maxHue: 360 } });
+		expect(result).toEqual({ siteConfig: { minHue: 0, maxHue: 360 } });
 	});
 
 	it('handles arrays', () => {
@@ -60,7 +60,7 @@ describe('maxifyKeys', () => {
 
 	it('is inverse of minifyKeys', () => {
 		const original = {
-			colorConfig: { minSaturation: 30, maxLightness: 70 },
+			siteConfig: { minSaturation: 30, maxLightness: 70 },
 			customNickColors: { user1: { color: 'hsl(180, 50%, 50%)' } }
 		};
 		const minified = minifyKeys(original);
@@ -101,15 +101,11 @@ describe('exportSettings', () => {
 
 	it('only includes non-default values', () => {
 		// Reset to defaults
-		Object.assign(colorConfig, DEFAULT_COLOR_CONFIG);
-		Object.assign(siteThemeConfig, DEFAULT_SITE_THEME_CONFIG);
-		Object.assign(styleConfig, DEFAULT_STYLE_CONFIG);
+		Object.assign(siteConfig, DEFAULT_SITE_CONFIG);
 
 		const result = exportSettings();
 		// With all defaults, only version/exportedAt should be present
-		expect(result.colorConfig).toBeUndefined();
-		expect(result.siteThemeConfig).toBeUndefined();
-		expect(result.styleConfig).toBeUndefined();
+		expect(result.siteConfig).toBeUndefined();
 	});
 });
 
@@ -127,14 +123,14 @@ describe('importSettings', () => {
 	});
 
 	it('returns success for valid color config data', () => {
-		const data = { colorConfig: { minSaturation: 40 } };
+		const data = { siteConfig: { minSaturation: 40 } };
 		const result = importSettings(data);
 		expect(result.success).toBe(true);
 		expect(result.message).toBe('Settings imported successfully');
 	});
 
 	it('returns success for minified keys', () => {
-		const data = { cc: { mS: 35 } }; // minified colorConfig.minSaturation
+		const data = { cc: { mS: 35 } }; // minified siteConfig.minSaturation
 		const result = importSettings(data);
 		expect(result.success).toBe(true);
 	});

@@ -8,6 +8,7 @@ const sass = require('sass');
 const SRC_DIR = path.join(__dirname, 'src');
 const OUTPUT_FILE = path.join(__dirname, 'cyberspace-nick-colors.user.js');
 const STYLES_FILE = path.join(SRC_DIR, 'styles.scss');
+const CSS_OUTPUT_FILE = path.join(__dirname, 'tests', 'styles.css');
 
 // Get version from command line or default
 const version = process.argv[2] || '1.0.0';
@@ -42,6 +43,8 @@ if (fs.existsSync(STYLES_FILE)) {
 		const result = sass.compile(STYLES_FILE, { style: 'compressed' });
 		compiledCSS = result.css;
 		console.log(`  + styles.scss (${(compiledCSS.length / 1024).toFixed(1)} KB compiled)`);
+		// Also output standalone CSS for visual testing
+		fs.writeFileSync(CSS_OUTPUT_FILE, compiledCSS);
 	} catch (err) {
 		console.error('SCSS compilation failed:', err.message);
 		process.exit(1);
@@ -79,6 +82,7 @@ const codeParts = [
 	'nick-functions.js',
 	'slider-component.js',
 	'dialog-component.js',
+	'settings-engine.js',
 	'user-settings-panel.js',
 	'site-settings-panel.js',
 	'init.js',

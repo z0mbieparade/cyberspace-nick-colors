@@ -4,14 +4,16 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Nick Colors - Visual Test Suite</title>
+	<!-- Compiled styles from build (run `node build.js` to generate) -->
+	<link rel="stylesheet" href="styles.css">
 	<style>
-		:root { --color-bg: #0a0a0a; --color-fg: #e0e0e0; }
+		:root { --nc-bg: #0a0a0a; --nc-fg: #e0e0e0; }
 		* { box-sizing: border-box; margin: 0; padding: 0; }
 		body {
 			font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
 			font-size: 11px;
-			background: var(--color-bg);
-			color: var(--color-fg);
+			background: var(--nc-bg);
+			color: var(--nc-fg);
 			padding: 0.5rem;
 			line-height: 1.4;
 		}
@@ -19,7 +21,7 @@
 		h1 + p { font-size: 0.9em; opacity: 0.6; margin-bottom: 0.5rem; }
 		h2 {
 			font-size: 0.95rem;
-			border-bottom: 1px solid var(--color-fg);
+			border-bottom: 1px solid var(--nc-border);
 			padding: 0.25rem 0;
 			margin-top: 0.5rem;
 			cursor: pointer; user-select: none;
@@ -41,28 +43,31 @@
 		.subsection.collapsed { max-height: 0 !important; opacity: 0; }
 		.section {
 			margin-bottom: 0.5rem; padding: 0.4rem 0.5rem;
-			background: var(--color-bg); border: 1px solid var(--color-fg); border-radius: 4px;
+			background: var(--nc-bg); border: 1px solid var(--nc-border); border-radius: 4px;
 			overflow: hidden; transition: max-height 0.2s ease-out, padding 0.2s ease-out, opacity 0.15s;
 		}
 		.section.collapsed { max-height: 0 !important; padding: 0 0.5rem; margin-bottom: 0.25rem; opacity: 0; border-color: transparent; }
 		.test-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.15rem 0; padding: 0.2rem 0.4rem; background: transparent; border-radius: 3px; }
 		.test-label { min-width: 140px; opacity: 0.6; font-size: 0.9em; }
 		.test-value { font-weight: bold; }
-		.color-swatch { width: 40px; height: 18px; border-radius: 2px; border: 1px solid var(--color-fg); opacity: 0.8; flex-shrink: 0; }
+		.color-swatch { width: 40px; height: 18px; border-radius: 2px; border: 1px solid var(--nc-border); opacity: 0.8; flex-shrink: 0; }
 		.nick-preview { padding: 0.1rem 0.3rem; border-radius: 2px; }
 		.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.3rem; }
 		.theme-card { padding: 0.4rem; border-radius: 4px; text-align: center; font-size: 0.85em; }
 		.theme-card .name { font-weight: bold; margin-bottom: 0.2rem; }
 		.theme-card .colors { font-size: 0.75em; opacity: 0.7; }
 		.contrast-table { width: 100%; border-collapse: collapse; margin-top: 0.3rem; font-size: 0.9em; }
-		.contrast-table th, .contrast-table td { padding: 0.2rem 0.4rem; text-align: left; border: 1px solid var(--color-fg); }
+		.contrast-table th, .contrast-table td { padding: 0.2rem 0.4rem; text-align: left; border: 1px solid var(--nc-border); }
 		.contrast-table th { opacity: 0.7; }
 		.pass { opacity: 1; }
 		.fail { opacity: 0.5; }
 		.equation { font-family: serif; font-style: italic; opacity: 0.7; padding: 0.2rem 0.5rem; border-radius: 3px; margin: 0.2rem 0; font-size: 0.95em; }
 		.result { font-weight: bold; }
+		.inverted-container { background-color: var(--nc-inverted-bg); color: var(--nc-inverted-fg); }
+		.sample-nicks-base { background-color: #0a0a0a; color: #e0e0e0; }
+		.inverted-container.sample-nicks-base { background-color: #e0e0e0; color: #0a0a0a; }
 		code { opacity: 0.8; padding: 0.1rem 0.3rem; border-radius: 2px; }
-		input, select { background: rgba(255,255,255,0.1); border: 1px solid var(--color-fg); color: var(--color-fg); }
+		input, select { background: rgba(255,255,255,0.1); border: 1px solid var(--nc-fg); color: var(--nc-fg); }
 		p { margin: 0.2rem 0; }
 		@media (min-width: 900px) {
 			.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; align-items: start; }
@@ -101,18 +106,43 @@
 		</div>
 	</div>
 
-	<h2>2. Color Generation</h2>
+	<h2>2. Live Nick Preview</h2>
+	<div class="section" id="live-preview">
+		<div class="columns">
+			<div>
+				<h3>2.1 Theme</h3>
+				<div class="subsection">
+					<div id="sample-nicks" class="grid sample-nicks"></div>
+					<div id="sample-nicks-inverted" class="grid inverted-container sample-nicks"></div>
+				</div>
+			</div>
+			<div>
+				<h3>2.2 Base (Full Spectrum)</h3>
+				<div class="subsection">
+					<div id="sample-nicks-base" class="grid sample-nicks sample-nicks-base"></div>
+					<div id="sample-nicks-inverted-base" class="grid inverted-container sample-nicks-base sample-nicks"></div>
+				</div>
+			</div>
+		</div>
+		<h3>2.3 Custom Test</h3>
+		<div class="subsection">
+			<input type="text" id="custom-username" placeholder="Enter username..." style="padding: 0.2rem; width: 150px; border-radius: 3px;">
+			<div id="custom-nick-result" style="margin-top: 0.3rem;"></div>
+		</div>
+	</div>
+
+	<h2>3. Color Generation</h2>
 	<div class="section" id="color-generation">
 		<div class="columns">
 			<div>
-				<h3>2.1 Hash-Based Colors</h3>
+				<h3>3.1 Hash-Based Colors</h3>
 				<div class="subsection">
 					<p>Same username = same color (case-insensitive):</p>
 					<div id="hash-colors"></div>
 				</div>
 			</div>
 			<div>
-				<h3>2.2 Base vs Mapped Colors</h3>
+				<h3>3.2 Base vs Mapped Colors</h3>
 				<div class="subsection">
 					<p>Base colors mapped to configured ranges:</p>
 					<div id="base-vs-mapped"></div>
@@ -121,24 +151,24 @@
 		</div>
 	</div>
 
-	<h2>3. Range Mapping</h2>
+	<h2>4. Range Mapping</h2>
 	<div class="section" id="range-mapping">
 		<div class="columns">
 			<div>
-				<h3>3.1 Linear Mapping</h3>
+				<h3>4.1 Linear Mapping</h3>
 				<div class="subsection">
 					<p class="equation">mapped = min + (value/100) × (max-min)</p>
 					<div id="linear-mapping"></div>
 				</div>
 
-				<h3>3.2 Hue Mapping (Normal)</h3>
+				<h3>4.2 Hue Mapping (Normal)</h3>
 				<div class="subsection">
 					<p class="equation">mapped = minHue + (hue/360) × (maxHue-minHue)</p>
 					<div id="hue-mapping"></div>
 				</div>
 			</div>
 			<div>
-				<h3>3.3 Hue Mapping (Wrap-Around)</h3>
+				<h3>4.3 Hue Mapping (Wrap-Around)</h3>
 				<div class="subsection">
 					<p>Range [300,60] wraps through 0:</p>
 					<div id="hue-wraparound"></div>
@@ -147,24 +177,24 @@
 		</div>
 	</div>
 
-	<h2>4. WCAG Contrast Detection</h2>
+	<h2>5. WCAG Contrast Detection</h2>
 	<div class="section" id="wcag-contrast">
 		<div class="columns">
 			<div>
-				<h3>4.1 Relative Luminance</h3>
+				<h3>5.1 Relative Luminance</h3>
 				<div class="subsection">
 					<p class="equation">L = 0.2126R + 0.7152G + 0.0722B</p>
 					<div id="luminance-tests"></div>
 				</div>
 
-				<h3>4.2 Contrast Ratio</h3>
+				<h3>5.2 Contrast Ratio</h3>
 				<div class="subsection">
 					<p class="equation">ratio = (L₁+0.05) / (L₂+0.05)</p>
 					<div id="contrast-ratio-tests"></div>
 				</div>
 			</div>
 			<div>
-				<h3>4.3 WCAG Thresholds</h3>
+				<h3>5.3 WCAG Thresholds</h3>
 				<div class="subsection">
 					<table class="contrast-table" id="wcag-thresholds">
 						<thead><tr><th>Color</th><th>BG</th><th>Ratio</th><th>AA</th><th>AAA</th></tr></thead>
@@ -175,44 +205,26 @@
 		</div>
 	</div>
 
-	<h2>5. Contrast Inversion</h2>
+	<h2>6. Contrast Inversion</h2>
 	<div class="section" id="contrast-inversion">
 		<div class="columns">
 			<div>
-				<h3>5.1 Auto-Inversion</h3>
+				<h3>6.1 Auto-Inversion</h3>
 				<div class="subsection">
 					<p>Low contrast colors get inverted (bg=color, text=fg):</p>
 					<div id="inversion-examples"></div>
 				</div>
 			</div>
 			<div>
-				<h3>5.2 Inverted Container</h3>
+				<h3>6.2 Inverted Container</h3>
 				<div class="subsection">
 					<p>Light-bg containers reverse inversion logic:</p>
-					<div class="profile-box-inverted" id="inverted-nicks"></div>
+					<div class="profile-box-inverted inverted-container" id="inverted-nicks"></div>
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<h2>6. Live Nick Preview</h2>
-	<div class="section" id="live-preview">
-		<div class="columns">
-			<div>
-				<h3>6.1 Sample Usernames</h3>
-				<div class="subsection">
-					<div id="sample-nicks" class="grid"></div>
-				</div>
-			</div>
-			<div>
-				<h3>6.2 Custom Test</h3>
-				<div class="subsection">
-					<input type="text" id="custom-username" placeholder="Enter username..." style="padding: 0.2rem; width: 150px; border-radius: 3px;">
-					<div id="custom-nick-result" style="margin-top: 0.3rem;"></div>
-				</div>
-			</div>
-		</div>
-	</div>
 
 	<!-- Mock GM APIs before loading source files -->
 	<script>
@@ -226,11 +238,17 @@
 		window.GM_xmlhttpRequest = () => {};
 	</script>
 
-	<!-- Load source files in order -->
+	<!-- Load source files in order (same as build.js) -->
 	<script src="../src/helper-functions.js"></script>
 	<script src="../src/header.js"></script>
+	<script src="../src/import-export.js"></script>
+	<script src="../src/send-message.js"></script>
+	<script src="../src/debug.js"></script>
 	<script src="../src/nick-style-functions.js"></script>
+	<script src="../src/nick-functions.js"></script>
 	<script src="../src/slider-component.js"></script>
+	<script src="../src/dialog-component.js"></script>
+	<script src="../src/settings-engine.js"></script>
 
 	<!-- Visual test specific code -->
 	<script>
@@ -246,30 +264,31 @@
 	let hueSlider, satSlider, litSlider, contrastSlider;
 	let slidersInitialized = false;
 
-	function setTheme(themeName) {
+	function setTheme(themeName, save = true) {
 		const theme = PRESET_THEMES[themeName];
 		if (!theme) return;
 
 		currentThemeName = themeName;
-		// Update colorConfig from theme
-		Object.assign(colorConfig, { ...DEFAULT_COLOR_CONFIG, ...theme.color });
-		bgRgb = hexToRgb(theme.bg) || { r: 10, g: 10, b: 10 };
+		if (save) localStorage.setItem('visualTestTheme', themeName);
+		// Set siteThemeName so generateStyles can look up preset theme logic
+		siteThemeName = themeName.toLowerCase();
+		// Update siteConfig from theme (theme.settings contains the color range settings)
+		Object.assign(siteConfig, { ...DEFAULT_SITE_CONFIG, ...theme.settings });
+		// theme.colors contains fg, bg, etc.
+		bgRgb = hexToRgb(theme.colors.bg) || { r: 10, g: 10, b: 10 };
 
-		// Update siteTheme for getBackgroundRgb/getForegroundRgb
-		siteTheme = { fg: theme.fg, bg: theme.bg };
+		// Include all theme colors so generateStyles can reference them (e.g., Poetry's fgDim for invertedContainerBg)
+		siteTheme = { ...theme.colors };
 
-		// Update CSS variables for the page
-		document.documentElement.style.setProperty('--color-bg', theme.bg);
-		document.documentElement.style.setProperty('--color-fg', theme.fg);
-		document.body.style.background = theme.bg;
-		document.body.style.color = theme.fg;
+		// Update all NC CSS variables (body uses var(--nc-bg/fg) so it updates automatically)
+		initCssVariables(siteThemeName);
 
 		// Update sliders if they exist
 		if (slidersInitialized) {
-			hueSlider.setValues([colorConfig.minHue, colorConfig.maxHue]);
-			satSlider.setValues([colorConfig.minSaturation, colorConfig.maxSaturation]);
-			litSlider.setValues([colorConfig.minLightness, colorConfig.maxLightness]);
-			contrastSlider.setValue(colorConfig.contrastThreshold);
+			hueSlider.setValues([siteConfig.minHue, siteConfig.maxHue]);
+			satSlider.setValues([siteConfig.minSaturation, siteConfig.maxSaturation]);
+			litSlider.setValues([siteConfig.minLightness, siteConfig.maxLightness]);
+			contrastSlider.setValue(siteConfig.contrastThreshold);
 			updateSliderGradients();
 		}
 
@@ -314,7 +333,7 @@
 		const [minLightness, maxLightness] = litSlider.getValues();
 		const contrastThreshold = contrastSlider.getValue();
 
-		Object.assign(colorConfig, { minHue, maxHue, minSaturation, maxSaturation, minLightness, maxLightness, contrastThreshold });
+		Object.assign(siteConfig, { minHue, maxHue, minSaturation, maxSaturation, minLightness, maxLightness, contrastThreshold });
 		updateSliderGradients();
 
 		renderColorGeneration();
@@ -329,28 +348,28 @@
 
 		hueSlider = createSlider({
 			type: 'range', min: 0, max: 360,
-			values: [colorConfig.minHue, colorConfig.maxHue],
+			values: [siteConfig.minHue, siteConfig.maxHue],
 			label: 'Hue Range (0-360°)',
 			onChange: onSliderChange
 		});
 
 		satSlider = createSlider({
 			type: 'range', min: 0, max: 100,
-			values: [colorConfig.minSaturation, colorConfig.maxSaturation],
+			values: [siteConfig.minSaturation, siteConfig.maxSaturation],
 			label: 'Saturation Range (0-100%)',
 			onChange: onSliderChange
 		});
 
 		litSlider = createSlider({
 			type: 'range', min: 0, max: 100,
-			values: [colorConfig.minLightness, colorConfig.maxLightness],
+			values: [siteConfig.minLightness, siteConfig.maxLightness],
 			label: 'Lightness Range (0-100%)',
 			onChange: onSliderChange
 		});
 
 		contrastSlider = createSlider({
 			simple: true, min: 0, max: 21, step: 0.5,
-			value: colorConfig.contrastThreshold,
+			value: siteConfig.contrastThreshold,
 			label: 'Contrast Threshold (WCAG ratio, 0=disabled, 4.5=AA, 7=AAA)',
 			onChange: onSliderChange
 		});
@@ -389,17 +408,17 @@
 		currentThemeDiv.innerHTML = `
 			<div class="test-row">
 				<span class="test-label">FG/BG:</span>
-				<div class="color-swatch" style="background: ${theme.fg}"></div>
-				<div class="color-swatch" style="background: ${theme.bg}"></div>
-				<span class="test-value">${theme.fg} / ${theme.bg}</span>
+				<div class="color-swatch" style="background: ${theme.colors.fg}"></div>
+				<div class="color-swatch" style="background: ${theme.colors.bg}"></div>
+				<span class="test-value">${theme.colors.fg} / ${theme.colors.bg}</span>
 			</div>
 		`;
 
 		const presetsDiv = document.getElementById('preset-themes');
 		presetsDiv.innerHTML = Object.entries(PRESET_THEMES).map(([name, theme]) => `
-			<div class="theme-card" style="background: ${theme.bg}; color: ${theme.fg}; border: 1px solid ${name === currentThemeName ? theme.fg : theme.fg + '33'}; cursor: pointer;" onclick="setTheme('${name}')">
+			<div class="theme-card" style="background: ${theme.colors.bg}; color: ${theme.colors.fg}; border: 1px solid ${name === currentThemeName ? theme.colors.fg : theme.colors.fg + '33'}; cursor: pointer;" onclick="setTheme('${name}')">
 				<div class="name">${name}</div>
-				<div style="font-size: 0.7em; opacity: 0.7;">H:${theme.color.minHue}-${theme.color.maxHue}</div>
+				<div style="font-size: 0.7em; opacity: 0.7;">H:${theme.settings.minHue}-${theme.settings.maxHue}</div>
 			</div>
 		`).join('');
 	}
@@ -409,19 +428,21 @@
 		const testUsers = ['Alice', 'alice', 'Bob', 'z0ylent'];
 
 		hashDiv.innerHTML = testUsers.map(user => {
-			const base = getBaseColor(user);
+			const base = getNickBase(user, 'hsl', { includeStyles: false });
 			const color = `hsl(${base.h}, ${base.s}%, ${base.l}%)`;
 			return `<div class="test-row">
 				<span class="test-label">${user}</span>
 				<div class="color-swatch" style="background: ${color}"></div>
-				<span class="test-value">H${base.h} S${base.s} L${base.l}</span>
+				<span class="test-value">H${base.h.toFixed(0)} S${base.s.toFixed(0)} L${base.l.toFixed(0)}</span>
 			</div>`;
 		}).join('');
 
 		const mappedDiv = document.getElementById('base-vs-mapped');
 		mappedDiv.innerHTML = ['neo', 'trinity', 'morpheus', 'alice', 'bob', 'cypher', 'tank', 'dozer'].map(user => {
-			const base = getBaseColor(user);
-			const mapped = applyRangeMapping(base, colorConfig);
+			const base = getNickBase(user, 'hsl', { includeStyles: false });
+			const mapped = applyRangeMappingToColor(base, 'hsl', {
+				effectiveConfig: siteConfig
+			});
 			const baseColor = `hsl(${base.h}, ${base.s}%, ${base.l}%)`;
 			const mappedColor = `hsl(${mapped.h.toFixed(1)}, ${mapped.s.toFixed(1)}%, ${mapped.l.toFixed(1)}%)`;
 			return `<div class="test-row">
@@ -500,7 +521,7 @@
 		];
 
 		lumDiv.innerHTML = lumTests.map(t => {
-			const result = getRelativeLuminance(t.rgb.r, t.rgb.g, t.rgb.b);
+			const result = getRelativeLuminance(t.rgb);
 			const pass = Math.abs(result - t.expected) < 0.01;
 			const bg = `rgb(${t.rgb.r}, ${t.rgb.g}, ${t.rgb.b})`;
 			return `<div class="test-row">
@@ -563,44 +584,52 @@
 			{ name: 'L:70-90', minLightness: 70, maxLightness: 90 },
 		];
 
-		inversionDiv.innerHTML = configs.map(cfg => {
-			const config = { ...DEFAULT_COLOR_CONFIG, ...cfg, contrastThreshold: 4.5 };
-			return `<div style="margin-bottom:0.3rem;"><strong style="opacity:0.6;font-size:0.85em;">${cfg.name}</strong>
-				${testUsers.map(user => {
-					// Temporarily set colorConfig for generateStyles
-					const savedConfig = { ...colorConfig };
-					Object.assign(colorConfig, config);
-					const styles = generateStyles(user);
-					Object.assign(colorConfig, savedConfig);
+		inversionDiv.innerHTML = '';
+		configs.forEach(cfg => {
+			const config = { ...DEFAULT_SITE_CONFIG, ...cfg, contrastThreshold: 4.5 };
+			const row = document.createElement('div');
+			row.style.marginBottom = '0.3rem';
 
-					const preview = styles.backgroundColor
-						? `<span class="nick-preview" style="background:${styles.backgroundColor};color:${styles.color};padding:${styles.padding}">${user}</span>`
-						: `<span class="nick-preview" style="color:${styles.color}">${user}</span>`;
+			const label = document.createElement('strong');
+			label.style.opacity = '0.6';
+			label.style.fontSize = '0.85em';
+			label.textContent = cfg.name;
+			row.appendChild(label);
+			row.appendChild(document.createTextNode(' '));
 
-					const hsl = parseColorToHsl(styles.backgroundColor || styles.color);
-					const colorRgb = hsl ? hslToRgb(hsl.h, hsl.s, hsl.l) : null;
-					const ratio = colorRgb ? getContrastRatio(colorRgb, bgRgb) : 0;
-					return `${preview}<span style="opacity:0.5;font-size:0.8em;margin-left:0.2rem;">${ratio.toFixed(1)}</span>`;
-				}).join(' ')}
-			</div>`;
-		}).join('');
+			testUsers.forEach(user => {
+				const span = document.createElement('span');
+				span.className = 'nick-preview';
+				span.textContent = user;
+				row.appendChild(span);
 
-		// Inverted container demo - use actual applyStyles with DOM elements
-		const theme = PRESET_THEMES[currentThemeName];
+				// Apply styles with the test config
+				applyStyles(span, user, {
+					themeName: siteThemeName,
+					effectiveConfig: config,
+					isInverted: false,
+				});
+
+				// Show contrast ratio
+				const ratio = span.dataset.contrastRatio || '?';
+				const ratioSpan = document.createElement('span');
+				ratioSpan.style.opacity = '0.5';
+				ratioSpan.style.fontSize = '0.8em';
+				ratioSpan.style.marginLeft = '0.2rem';
+				ratioSpan.style.marginRight = '0.5rem';
+				ratioSpan.textContent = ratio;
+				row.appendChild(ratioSpan);
+			});
+
+			inversionDiv.appendChild(row);
+		});
+
+		// Inverted container demo - .inverted-container class uses CSS vars set by initCssVariables()
 		const invertedNicks = document.getElementById('inverted-nicks');
-		invertedNicks.style.background = theme.fg;
-		invertedNicks.style.color = theme.bg;
-		invertedNicks.style.padding = '0.4rem';
-		invertedNicks.style.borderRadius = '4px';
 		invertedNicks.innerHTML = '';
 
 		// Use more test users to show variety of contrast scenarios
 		const invertedTestUsers = ['dark', 'light', 'mid', 'neo', 'trinity', 'alice'];
-		const containerBgRgb = hexToRgb(theme.fg) || { r: 224, g: 224, b: 224 };
-
-		// Force high lightness to demonstrate inversion in light containers
-		const savedConfig = { ...colorConfig };
-		Object.assign(colorConfig, { ...colorConfig, minLightness: 70, maxLightness: 90 });
 
 		invertedTestUsers.forEach(user => {
 			const span = document.createElement('span');
@@ -608,75 +637,89 @@
 			span.textContent = user;
 			invertedNicks.appendChild(span);
 
-			// Use the actual applyStyles function from the source
-			applyStyles(span, user);
+			// Use applyStyles with isInverted: true - use theme's actual settings
+			applyStyles(span, user, { 
+				themeName: siteThemeName,
+				isInverted: true 
+			});
 
-			// Show contrast ratio
-			const styles = generateStyles(user);
-			const hsl = parseColorToHsl(styles.backgroundColor || styles.color);
-			if (hsl) {
-				const rgb = hslToRgb(hsl.h, hsl.s, hsl.l);
-				const ratio = getContrastRatio(rgb, containerBgRgb);
-				const ratioSpan = document.createElement('span');
-				ratioSpan.style.opacity = '0.5';
-				ratioSpan.style.fontSize = '0.8em';
-				ratioSpan.style.marginRight = '0.5em';
-				ratioSpan.textContent = ratio.toFixed(1);
-				invertedNicks.appendChild(ratioSpan);
-			} else {
-				invertedNicks.appendChild(document.createTextNode(' '));
-			}
+			// Show contrast ratio from dataset
+			const ratioSpan = document.createElement('span');
+			ratioSpan.style.opacity = '0.5';
+			ratioSpan.style.fontSize = '0.8em';
+			ratioSpan.style.marginRight = '0.5em';
+			ratioSpan.textContent = span.dataset.contrastRatio || '?';
+			invertedNicks.appendChild(ratioSpan);
 		});
-
-		// Restore config
-		Object.assign(colorConfig, savedConfig);
 	}
 
 	let customInputInitialized = false;
 
 	function updateCustomNickResult() {
 		const input = document.getElementById('custom-username');
-		const result = document.getElementById('custom-nick-result');
+		const resultDiv = document.getElementById('custom-nick-result');
 		const username = input.value.trim();
-		if (!username) { result.innerHTML = ''; return; }
+		if (!username) { resultDiv.innerHTML = ''; return; }
 
-		const base = getBaseColor(username);
-		const styles = generateStyles(username);
-		const preview = styles.backgroundColor
-			? `<span class="nick-preview" style="background:${styles.backgroundColor};color:${styles.color};padding:${styles.padding};font-size:1.2em;">${username}</span>`
-			: `<span class="nick-preview" style="color:${styles.color};font-size:1.2em;">${username}</span>`;
+		resultDiv.innerHTML = '';
 
-		const hsl = parseColorToHsl(styles.backgroundColor || styles.color);
-		const colorRgb = hsl ? hslToRgb(hsl.h, hsl.s, hsl.l) : null;
-		const contrastRatio = colorRgb ? getContrastRatio(colorRgb, bgRgb) : null;
+		// Create and style the preview span using applyStyles
+		const previewSpan = document.createElement('span');
+		previewSpan.className = 'nick-preview';
+		previewSpan.textContent = username;
+		previewSpan.style.fontSize = '1.2em';
+		applyStyles(previewSpan, username);
+		resultDiv.appendChild(previewSpan);
 
-		const ratioText = contrastRatio !== null ? `${contrastRatio.toFixed(1)}:1` : 'N/A';
-		const aaStatus = contrastRatio !== null
-			? `<span class="${contrastRatio >= 4.5 ? 'pass' : 'fail'}">${contrastRatio >= 4.5 ? 'AA✓' : 'AA✗'}</span>`
-			: '';
+		// Get data from the styled element
+		const base = getNickBase(username, 'hsl', { includeStyles: false });
+		const contrastRatio = parseFloat(previewSpan.dataset.contrastRatio) || 0;
+		const hasBackground = previewSpan.style.backgroundColor && previewSpan.style.backgroundColor !== '';
 		const isOverride = MANUAL_OVERRIDES[username] || MANUAL_OVERRIDES[username?.toLowerCase()];
-		result.innerHTML = `${preview}
-			<div class="test-row" style="margin-top:0.3rem;">
-				<span class="test-label">HSL:</span>
-				<span class="test-value">H${base.h} S${base.s} L${base.l}</span>
-				<span class="test-label">Ratio:</span>
-				<span class="test-value">${ratioText}</span>
-				${aaStatus}
-				<span class="test-value" style="margin-left:0.5rem;">${isOverride ? 'Override' : styles.backgroundColor ? 'Inverted' : ''}</span>
-			</div>`;
+
+		const ratioText = `${contrastRatio.toFixed(1)}:1`;
+		const aaStatus = `<span class="${contrastRatio >= 4.5 ? 'pass' : 'fail'}">${contrastRatio >= 4.5 ? 'AA✓' : 'AA✗'}</span>`;
+
+		const infoDiv = document.createElement('div');
+		infoDiv.className = 'test-row';
+		infoDiv.style.marginTop = '0.3rem';
+		infoDiv.innerHTML = `
+			<span class="test-label">HSL:</span>
+			<span class="test-value">H${base.h.toFixed(0)} S${base.s.toFixed(0)} L${base.l.toFixed(0)}</span>
+			<span class="test-label">Ratio:</span>
+			<span class="test-value">${ratioText}</span>
+			${aaStatus}
+			<span class="test-value" style="margin-left:0.5rem;">${isOverride ? 'Override' : hasBackground ? 'Inverted' : ''}</span>
+		`;
+		resultDiv.appendChild(infoDiv);
 	}
 
 	function renderLivePreview() {
-		const sampleNicks = document.getElementById('sample-nicks');
-		const sampleUsers = ['z0ylent', 'frexxx', 'CyB3rPuNk', 'ZeR0C00L', 'enki', 'neo', 'acidBurn', 'trinity'];
+		const sampleNickContainers = document.getElementsByClassName('sample-nicks');
+		const sampleUsers = [
+			'z0ylent', 'fexxx', 'fr33Kevin', 'triNity', 'an0nym0us', 'ZeR0C00L',
+			'l1sb3th', 'enki', 'genghis_khan', 'acidBurn', 'neo', 'N3tRuNn3r', 
+			'ByteMe99', 'CyB3rPuNk'
+		];
 
-		sampleNicks.innerHTML = sampleUsers.map(user => {
-			const styles = generateStyles(user);
-			if (styles.backgroundColor) {
-				return `<span class="nick-preview" style="background:${styles.backgroundColor};color:${styles.color};padding:${styles.padding}">${user}</span>`;
-			}
-			return `<span class="nick-preview" style="color:${styles.color}">${user}</span>`;
-		}).join('');
+		for(const el of sampleNickContainers) {
+			el.innerHTML = '';
+			const isInverted = el.classList.contains('inverted-container');
+			const isBase = el.classList.contains('sample-nicks-base');
+			sampleUsers.forEach(user => {
+				const span = document.createElement('span');
+				span.className = 'nick-preview';
+				span.textContent = user;
+				el.appendChild(span);
+
+				applyStyles(span, user, {
+					isInverted: isInverted,
+					themeName: isBase ? 'Full Spectrum' : siteThemeName,
+					effectiveConfig: isBase ? DEFAULT_SITE_CONFIG : siteConfig,
+					debugData: true,
+				});
+			});
+		}
 
 		if (!customInputInitialized) {
 			document.getElementById('custom-username').addEventListener('input', updateCustomNickResult);
@@ -792,8 +835,15 @@
 
 	document.addEventListener('DOMContentLoaded', async () => {
 		await loadOverrides();
-		// Initialize with the default theme
-		setTheme(currentThemeName);
+		// Load saved theme or use default
+		const savedTheme = localStorage.getItem('visualTestTheme');
+		if (savedTheme && PRESET_THEMES[savedTheme]) {
+			currentThemeName = savedTheme;
+		}
+		// Initialize CSS variables for the styles
+		initCssVariables();
+		// Initialize with the saved/default theme
+		setTheme(currentThemeName, false);
 		initSliders();
 		initCollapsibleSections();
 	});

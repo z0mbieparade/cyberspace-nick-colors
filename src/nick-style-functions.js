@@ -48,11 +48,20 @@ function makeStylesObject(styles)
  * and finally generates from hash if none are set.
  * Returns { h, s, l } in full range (h: 0-360, s: 0-100, l: 0-100)
  */
-function getNickBase(username, includeStyles = false, colorFormat = 'hsl') 
+function getNickBase(username, colorFormat = 'hsl', options = {}) 
 {
+	options = {
+		includeStyles: false,
+		effectiveConfig: getEffectiveSiteConfig(),
+		debugData: false,
+		...options
+	};
+
 	let styles = {
 		color: null
 	};
+
+	let debugData = [];
 
 	// Check user-saved custom color first
 	if (customNickColors[username]) {
@@ -61,9 +70,11 @@ function getNickBase(username, includeStyles = false, colorFormat = 'hsl')
 		if (colorStr) {
 			const parsedColor = parseColor(colorStr, colorFormat);
 			if (parsedColor) styles.color = parsedColor;
+
+			debugData.push(['Source', 'Custom']);
 		}
 
-		if(includeStyles && typeof custom === 'object')
+		if(options.includeStyles && typeof custom === 'object')
 			styles = { ...custom, ...styles };
 	}
 
@@ -74,15 +85,41 @@ function getNickBase(username, includeStyles = false, colorFormat = 'hsl')
 		if (colorStr) {
 			const parsedColor = parseColor(colorStr, colorFormat);
 			if (parsedColor) styles.color = parsedColor;
+
+			debugData.push(['Source', 'Override']);
 		}
 
-		if(includeStyles && typeof override === 'object')
+		if(options.includeStyles && typeof override === 'object')
 			styles = { ...override, ...styles };
+	}
+
+	if (options.effectiveConfig.useSingleColor) 
+	{
+		// Single color mode - use configured single color
+		let hsl;
+		if (options.effectiveConfig.singleColorCustom) {
+			// Use custom color value if set
+			const parsed = parseColor(options.effectiveConfig.singleColorCustom, 'hsl');
+			hsl = parsed || { h: options.effectiveConfig.singleColorHue, s: options.effectiveConfig.singleColorSat, l: options.effectiveConfig.singleColorLit };
+		} else {
+			// Use H/S/L sliders
+			hsl = {
+				h: options.effectiveConfig.singleColorHue,
+				s: options.effectiveConfig.singleColorSat,
+				l: options.effectiveConfig.singleColorLit
+			};
+		}
+		styles = {
+			...styles,
+			color: parseColor(hsl, colorFormat),
+		};
+
+		delete styles.backgroundColor;
 	}
 
 	if(styles.color === null)
 	{
-		// No user-saved, or overrides, Generate from hash
+		// Normal mode - generate from hash
 		const hash = hashString(username);
 		const hash2 = hashString(username + '_sat');
 		const hash3 = hashString(username + '_lit');
@@ -97,23 +134,24 @@ function getNickBase(username, includeStyles = false, colorFormat = 'hsl')
 			...styles,
 			color: parseColor(hsl, colorFormat)
 		};
+
+		debugData.push(['Source', 'Hashed']);
 	}
 
-	if(includeStyles)
+	if(options.includeStyles)
 	{
 		// Apply style variations based on hash (unless already set by override)
-
 		const hashStyles = getHashBasedStyleVariations(username);
-		if (styleConfig.varyWeight && !styles.fontWeight)
+		if (options.effectiveConfig.varyWeight && !styles.fontWeight)
 			styles.fontWeight = hashStyles.fontWeight;
-		if (styleConfig.varyItalic && !styles.fontStyle)
+		if (options.effectiveConfig.varyItalic && !styles.fontStyle)
 			styles.fontStyle = hashStyles.fontStyle;
-		if (styleConfig.varyCase && !styles.fontVariant)
+		if (options.effectiveConfig.varyCase && !styles.fontVariant)
 			styles.fontVariant = hashStyles.fontVariant;
 
-		if(styleConfig.prependIcon || styleConfig.appendIcon)
+		if(options.effectiveConfig.prependIcon || options.effectiveConfig.appendIcon)
 		{
-			const icon = getHashBasedIcon(username);
+			const icon = getHashBasedIcon(username, { effectiveConfig: options.effectiveConfig });
 			if(styles.appendIcon !== false)
 				styles.appendIcon = icon;
 			if(styles.prependIcon !== false)
@@ -121,7 +159,12 @@ function getNickBase(username, includeStyles = false, colorFormat = 'hsl')
 		}
 	}
 
-	return includeStyles ? styles : styles.color;
+	if(options.debugData)
+	{
+		styles.debugData = debugData;
+	}
+
+	return options.includeStyles ? styles : styles.color;
 }
 
 
@@ -129,9 +172,15 @@ function getNickBase(username, includeStyles = false, colorFormat = 'hsl')
  * Get hash-based icon for a username (ignores overrides, for display defaults)
  * Returns the same icon for both prepend and append by default
  */
-function getHashBasedIcon(username, config = styleConfig) {
-	if ((!config.prependIcon && !config.appendIcon) || !config.iconSet) return null;
-	const icons = config.iconSet.split(/\s+/).filter(Boolean);
+function getHashBasedIcon(username, options = {}) 
+{
+	options = {
+		effectiveConfig: getEffectiveSiteConfig(),
+		...options
+	};
+
+	if ((!options.effectiveConfig.prependIcon && !options.effectiveConfig.appendIcon) || !options.effectiveConfig.iconSet) return null;
+	const icons = options.effectiveConfig.iconSet.split(/\s+/).filter(Boolean);
 	if (icons.length === 0) return null;
 	const hash = hashString(username + '_icon');
 	return icons[hash % icons.length];
@@ -179,60 +228,108 @@ function getRawStylesForPicker(username)
  * Apply color color to a base color
  * Returns the mapped color in the requested format
  */
-function getMappedNickColor(username, includeStyles = false, colorFormat = 'hsl')
+function getMappedNickColor(username, colorFormat = 'hsl', options = {})
 {
-	const base = getNickBase(username, includeStyles, colorFormat);
-	const effectiveConfig = getEffectiveColorConfig();
-	let mapped = null;
+	options = {
+		includeStyles: false,
+		effectiveConfig: getEffectiveSiteConfig(),
+		debugData: false,
+		...options
+	};
 
-	if(includeStyles === true)
+	const base = getNickBase(username, colorFormat, options);
+	let mapped = null;
+	let debugData = [];
+
+	if(options.includeStyles === true)
 	{
+		if(options.debugData)
+		{
+			debugData = base.debugData || [];
+			delete base.debugData;
+		}
+
 		mapped = { ...base };
 		for(const key in base)
 		{
 			if(key.startsWith('color'))
 			{
 				mapped[toCamelCase('base-' + key)] = base[key];
-				mapped[key] = applyRangeMappingToColor(base[key], effectiveConfig, colorFormat);
+				mapped[key] = applyRangeMappingToColor(base[key], colorFormat, {
+					effectiveConfig: options.effectiveConfig,
+				});
 			}
 		}
+
+
+		if(options.debugData)
+		{
+			mapped.debugData = debugData;
+		}
 	}
-	else 
+	else
 	{
-		mapped = applyRangeMappingToColor(base, effectiveConfig, colorFormat)
+		mapped = applyRangeMappingToColor(base, colorFormat, {
+			effectiveConfig: options.effectiveConfig,
+		})
 	}
-	
+
 	return mapped;
 }
 
-function generateStyles(username, invertedContainer = false) 
+function generateStyles(username, options = {}) 
 {
-	const effectiveConfig = getEffectiveColorConfig();
-	const threshold = effectiveConfig.contrastThreshold || 4.5;
-	const nickStyles = getMappedNickColor(username, true);
-	const presetTheme = siteThemeName ? getPresetTheme(siteThemeName) : null;
+	options = {
+		themeName: siteThemeName,
+		effectiveConfig: getEffectiveSiteConfig(),
+		isInverted: false,
+		debugData: false,
+		...options
+	};
+
+	let debugData = [];
+
+	const threshold = options.effectiveConfig.contrastThreshold || 4.5;
+	const nickStyles = getMappedNickColor(username, 'hsl', {
+		includeStyles: true,
+		effectiveConfig: options.effectiveConfig,
+		debugData: options.debugData,
+	});
+	const themeColors = getThemeColors(options.themeName);
+
+	if(options.debugData)
+	{
+		debugData = nickStyles.debugData || [];
+		delete nickStyles.debugData;
+	}
 
 	let nickColorRGB = parseColor(nickStyles.color, 'rgb');
-	let elementBackgroundColor = invertedContainer ? siteTheme.fg : siteTheme.bg;
-	if(invertedContainer && presetTheme.logic && presetTheme.logic.invertedContainerBg) {
-		let invertedContainerBg = presetTheme.logic.invertedContainerBg;
-		if(siteTheme[invertedContainerBg])
-			invertedContainerBg = siteTheme[invertedContainerBg];
+	let elementBackgroundColor = options.isInverted ? themeColors.invertedBg : themeColors.bg;
+	const elementBgRGB = parseColor(elementBackgroundColor, 'rgb');
 
-		elementBackgroundColor = invertedContainerBg;
-	}
+	debugData.push(['Element BG', elementBackgroundColor ? parseColor(elementBgRGB, 'hsl-string') : 'N/A']);
 
 	let nickBgColorRGB = parseColor(nickStyles.backgroundColor ?? elementBackgroundColor, 'rgb');
 
+	debugData.push(['Nick FG (raw)', nickColorRGB ? parseColor(nickColorRGB, 'hsl-string') : 'N/A']);
+	debugData.push(['Nick BG (raw)', nickBgColorRGB ? parseColor(nickBgColorRGB, 'hsl-string') : 'N/A']);
+
 	// Handle inversion based on per-user setting or auto contrast
 	let contrastRatio = getContrastRatio(nickColorRGB, nickBgColorRGB);
+	debugData.push(['Contrast (raw)', +contrastRatio.toFixed(2)]);
+
 	let shouldInvert = false;
 
 	// User explicitly set inversion
 	if (nickStyles.invert === true || nickStyles.invert === false)
+	{
 		shouldInvert = nickStyles.invert;
-	else if(threshold > 0)
+		debugData.push(['User Invert', nickStyles.invert]);
+	}
+	else if(threshold > 0) {
 		shouldInvert = contrastRatio < threshold;
+		debugData.push(['Thresh Invert', shouldInvert]);
+	}
 
 	const nickFg = parseColor(nickStyles.color, 'hsl-string');
 	const nickBg = nickStyles.backgroundColor ? parseColor(nickStyles.backgroundColor, 'hsl-string') : null;
@@ -245,26 +342,48 @@ function generateStyles(username, invertedContainer = false)
 	if(shouldInvert)
 	{
 		let invertBg = nickFg;
-		let invertFg = nickBg? nickBg : pickBestContrastingColor(nickFg, 'hsl-string', invertedContainer ? true : false);
+		let invertFg = nickBg ? nickBg : pickBestContrastingColor(nickFg, 'hsl-string', {
+			themeName: options.themeName,
+			isInverted: true,
+			effectiveConfig: options.effectiveConfig,
+			debugData: options.debugData
+		});
 
-		const adjustedColors = adjustContrastToThreshold(invertBg, invertFg, threshold, 'hsl-string');
-		styles.color = adjustedColors.colorAdjust;
-		styles.backgroundColor = adjustedColors.colorCompare;
+		if(!options.effectiveConfig.useSingleColor)
+		{
+			const adjustedColors = adjustContrastToThreshold(invertBg, invertFg, threshold, 'hsl-string');
+			styles.color = adjustedColors.colorAdjust;
+			styles.backgroundColor = adjustedColors.colorCompare;
+		}
+		else 
+		{
+			styles.color = invertFg;
+			styles.backgroundColor = invertBg;
+		}
 
-		contrastRatio = getContrastRatio(adjustedColors.colorCompare, adjustedColors.colorAdjust);
+		debugData.push(['Nick FG (adj)', styles.color || 'N/A']);
+		debugData.push(['Nick BG (adj)', styles.backgroundColor || 'N/A']);
+
+		contrastRatio = getContrastRatio(styles.color, styles.backgroundColor);
 	}
-	else 
+	else
 	{
-		const adjustedColors = adjustContrastToThreshold(nickBgColorRGB, nickFg, threshold, 'hsl-string');
-		styles.color = adjustedColors.colorAdjust;
+		if(!options.effectiveConfig.useSingleColor)
+		{
+			const adjustedColors = adjustContrastToThreshold(nickBgColorRGB, nickFg, threshold, 'hsl-string');
+			styles.color = adjustedColors.colorAdjust;
+			debugData.push(['Nick FG (adj)', styles.color || 'N/A']);
+		}
 
-		contrastRatio = getContrastRatio(adjustedColors.colorCompare, adjustedColors.colorAdjust);
+		contrastRatio = getContrastRatio(styles.color, nickBgColorRGB);
 	}
+
+	debugData.push(['Contrast (adj)', +contrastRatio.toFixed(2)]);
 
 	return { 
 		styles, 
 		nickConfig: nickStyles,
-		contrastRatio: contrastRatio.toFixed(2),
+		debugData
 	};
 }
 
@@ -297,24 +416,51 @@ function getIconsForUsername(username) {
 	}
 
 	// Fall back to hash-based icon if enabled globally
-	const hashIcon = getHashBasedIcon(username);
+	const hashIcon = getHashBasedIcon(username, { effectiveConfig: options.effectiveConfig });
 	return {
-		prepend: (styleConfig.prependIcon && hashIcon) ? hashIcon : null,
-		append: (styleConfig.appendIcon && hashIcon) ? hashIcon : null
+		prepend: (options.effectiveConfig.prependIcon && hashIcon) ? hashIcon : null,
+		append: (options.effectiveConfig.appendIcon && hashIcon) ? hashIcon : null
 	};
 }
 
-function applyStyles(element, username, matchType = 'nick', invertedContainer = null, mergeStyles = {}) 
+function applyStyles(element, username, options = {}) 
 {
+	options = {
+		matchType: 'nick',
+		mergeStyles: {},
+		overridesStyles: null,
+		themeName: siteThemeName,
+		effectiveConfig: getEffectiveSiteConfig(),
+		debugData: false,
+		...options
+	};
+
+	let debugData = [];
+
+	if(element.querySelector('.nc-nick-debug'))
+		element.querySelector('.nc-nick-debug').remove();
+
 	// Check if element is in an inverted container
-	const isInverted = invertedContainer !== null ? invertedContainer : (
+	const isInverted = options.isInverted ?? (
 		INVERTED_CONTAINERS.length > 0 &&
 		INVERTED_CONTAINERS.some(sel => element.closest(sel))
 	);
 
-	let { styles, nickConfig, contrastRatio } = generateStyles(username, isInverted);
+	let { styles, nickConfig, contrastRatio, debugData: debugDataGenStyles } = generateStyles(username, {
+		themeName: options.themeName,
+		effectiveConfig: options.effectiveConfig,
+		debugData: options.debugData,
+		isInverted
+	});
 
-	styles = { ...styles, ...mergeStyles };
+	debugData = [...debugData, ...(debugDataGenStyles || [])];
+
+	styles = { ...styles, ...options.mergeStyles };
+
+	if(options.overrideStyles && typeof options.overrideStyles === 'object')
+	{
+		styles = { ...options.overrideStyles };
+	}
 
 	if (styles.data) {
 		for (const key in styles.data) {
@@ -330,7 +476,7 @@ function applyStyles(element, username, matchType = 'nick', invertedContainer = 
 		element.style.setProperty(styleKey, styles[key], 'important');
 	}
 
-	element.dataset[`${matchType}Colored`] = 'true';
+	element.dataset[`${options.matchType}Colored`] = 'true';
 	element.dataset.username = username;
 	element.dataset.contrastRatio = contrastRatio;
 
@@ -361,6 +507,53 @@ function applyStyles(element, username, matchType = 'nick', invertedContainer = 
 		delete element.dataset.iconApplied;
 		delete element.dataset.originalText;
 	}
+	
+	if(options.debugData)
+	{
+		// Store debug data for tooltip
+		element.dataset.ncDebug = JSON.stringify(debugData);
+		element.classList.add('nc-has-debug');
+
+		// Add tooltip on hover
+		element.addEventListener('mouseenter', showDebugTooltip);
+		element.addEventListener('mouseleave', hideDebugTooltip);
+	}
 
 	return element;
+}
+
+// Debug tooltip functions
+let debugTooltip = null;
+
+function showDebugTooltip(e) {
+	const element = e.currentTarget;
+	const debugData = JSON.parse(element.dataset.ncDebug || '[]');
+
+	if (!debugTooltip) {
+		debugTooltip = document.createElement('div');
+		debugTooltip.className = 'nc-debug-tooltip';
+		document.body.appendChild(debugTooltip);
+	}
+
+	// debugData is an array of [label, value] pairs
+	debugTooltip.innerHTML = debugData
+		.map(([label, value]) => {
+			const displayValue = typeof value === 'string' && value.startsWith('hsl')
+				? `<span class="nc-debug-swatch" style="background:${value}"></span>${value}`
+				: value;
+			return `<div class="nc-debug-row"><span class="nc-debug-label">${label}:</span> <span class="nc-debug-value">${displayValue}</span></div>`;
+		})
+		.join('');
+
+	// Position tooltip
+	const rect = element.getBoundingClientRect();
+	debugTooltip.style.left = rect.left + 'px';
+	debugTooltip.style.top = (rect.bottom + 4) + 'px';
+	debugTooltip.classList.add('visible');
+}
+
+function hideDebugTooltip() {
+	if (debugTooltip) {
+		debugTooltip.classList.remove('visible');
+	}
 }

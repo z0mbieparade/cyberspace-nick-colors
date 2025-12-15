@@ -42,11 +42,44 @@ function getOrCreateDebugPre(parent, classes = '') {
 	return debug;
 }
 
+function logDebug(id, data)
+{
+	DEBUG_LOG.push({
+		timestamp: new Date().toISOString(),
+		id, data
+	})
+}
+
+function exportDebug()
+{
+	if(!DEBUG_LOG)
+	{
+		alert("An error has occurred, please try again later");
+		return;
+	}
+
+	logDebug('Info', {
+		browser: navigator.userAgent,
+		url: window.location.href,
+		version: VERSION,
+	});
+
+	logDebug('Site Theme', siteTheme);
+	logDebug('Site Config', siteConfig);
+	logDebug('Effective Site Config', getEffectiveSiteConfig());
+	logDebug('Style Config', siteConfig);
+	logDebug('Custom Nick Colors', customNickColors);
+	logDebug('Manual Overrides', MANUAL_OVERRIDES);
+
+	console.log("Exporting debug info...");
+	console.log(DEBUG_LOG);
+}
+
 /**
  * Export debug logs for troubleshooting (returns plain text)
  */
 function exportDebugLogs() {
-	const eff = getEffectiveColorConfig();
+	const eff = getEffectiveSiteConfig();
 	const lines = [];
 
 	lines.push('='.repeat(60));
@@ -62,13 +95,6 @@ function exportDebugLogs() {
 	lines.push('SITE THEME');
 	lines.push('-'.repeat(60));
 	lines.push(`Site Theme: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
-	lines.push(`Site Theme Fg HSL: ${siteThemeFgHSL ? JSON.stringify(siteThemeFgHSL) : 'none'}`);
-	lines.push('');
-
-	lines.push('-'.repeat(60));
-	lines.push('COLOR CONFIG');
-	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(colorConfig, null, 2));
 	lines.push('');
 
 	lines.push('-'.repeat(60));
@@ -78,15 +104,15 @@ function exportDebugLogs() {
 	lines.push('');
 
 	lines.push('-'.repeat(60));
-	lines.push('SITE THEME CONFIG');
+	lines.push('SITE CONFIG');
 	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(siteThemeConfig, null, 2));
+	lines.push(JSON.stringify(siteConfig, null, 2));
 	lines.push('');
 
 	lines.push('-'.repeat(60));
 	lines.push('STYLE CONFIG');
 	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(styleConfig, null, 2));
+	lines.push(JSON.stringify(siteConfig, null, 2));
 	lines.push('');
 
 	lines.push('-'.repeat(60));
@@ -184,14 +210,13 @@ function showReportIssueDialog() {
 		}
 
 		// Build condensed debug info
-		const eff = getEffectiveColorConfig();
+		const eff = getEffectiveSiteConfig();
 		const debugInfo = `v${VERSION} | ${Object.keys(customNickColors).length} custom | H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`;
 
 		// Build condensed settings object
 		const settings = {
-			color: colorConfig,
-			siteTheme: siteThemeConfig,
-			style: styleConfig
+			siteConfig: siteConfig,
+			style: siteConfig
 		};
 
 		// Build message

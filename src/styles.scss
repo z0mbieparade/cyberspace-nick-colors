@@ -36,18 +36,6 @@
 		flex: 1;
 	}
 
-	// Preview styles
-	.preview-row {
-		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-		justify-content: space-around;
-	}
-
-	.preview-nick {
-		padding: 0.125rem 0.25rem !important;
-	}
-
 	// Typography
 	h3 {
 		margin: 0;
@@ -411,7 +399,8 @@
 	flex: 1;
 }
 
-.nc-dialog-preview {
+.nc-dialog-preview 
+{
 	padding: 0.5rem 1rem;
 	border-bottom: 1px solid var(--nc-border);
 	flex-shrink: 0;
@@ -419,11 +408,33 @@
 
 	.preview,
 	.preview-row {
+		font-size: var(--font-size-base);
+		line-height: var(--font-size-base);
 		margin: 0;
 		border: 1px solid var(--nc-border);
-		padding: 0.5rem;
-		margin: 0.75rem 0;
+		padding: 0.25rem;
+		margin: 0.5rem 0;
 		background: var(--nc-bg);
+		max-height: 3.1rem;
+		overflow: hidden;
+
+		&.preview-inverted
+		{
+			background: var(--nc-inverted-bg);
+			color: var(--nc-inverted-fg);
+		}
+	}
+
+	// Preview styles
+	.preview-row {
+		display: flex;
+		gap: .25rem;
+		flex-wrap: wrap;
+		justify-content: space-around;
+	}
+
+	.preview-nick {
+		padding: 0.125rem 0.25rem !important;
 	}
 }
 
@@ -535,6 +546,63 @@
 	span {
 		color: var(--nc-fg-dim);
 	}
+}
+
+// Debug tooltip for nick colors
+.nc-debug-tooltip {
+	position: fixed;
+	z-index: 9999999;
+	background: var(--nc-bg, #0a0a0a);
+	border: 1px solid var(--nc-border, #333);
+	color: var(--nc-fg, #e0e0e0);
+	padding: 0.25rem;
+	font-size: 11px;
+	font-family: monospace;
+	max-width: 350px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+
+	&.visible {
+		opacity: 1;
+	}
+}
+
+.nc-debug-row {
+	display: flex;
+	gap: 0.5rem;
+	padding: 0.125rem 0;
+	border-bottom: 1px dotted var(--nc-border, #333);
+
+	&:last-child {
+		border-bottom: none;
+	}
+}
+
+.nc-debug-label {
+	color: var(--nc-fg-dim, #888);
+	min-width: 90px;
+	flex-shrink: 0;
+}
+
+.nc-debug-value {
+	color: var(--nc-fg, #e0e0e0);
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.nc-debug-swatch {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border: 1px solid var(--nc-border, #333);
+	flex-shrink: 0;
+}
+
+.nc-has-debug {
+	cursor: help;
 }
 
 /* Add a bit of extra theme styling */
