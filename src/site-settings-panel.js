@@ -90,8 +90,8 @@ function createSettingsPanel()
 
 	// Define the settings schema
 	const schema = [
-		{ type: 'section', label: 'Color Mode', fields: [
-			{ key: 'useSingleColor', type: 'toggle', label: 'Use single color for all nicks', default: false },
+		{ type: 'section', label: 'Monochrome Mode', fields: [
+			{ key: 'useSingleColor', type: 'toggle', label: 'Use monochrome mode', default: false },
 			{ type: 'hint', text: 'All usernames will use the same color. Per-user color customization is disabled.',
 				showWhen: { field: 'useSingleColor', is: true } },
 			{ key: 'singleColorHue', type: 'slider', label: 'Hue', min: 0, max: 360,

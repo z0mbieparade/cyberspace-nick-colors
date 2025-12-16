@@ -106,15 +106,6 @@ function createInputRow(opts) {
 	return '';
 }
 
-// Legacy helper functions that delegate to createInputRow
-function createToggleRow(opts) {
-	return createInputRow({ ...opts, type: 'toggle' });
-}
-
-function createTriStateToggleRow(opts) {
-	return createInputRow({ ...opts, type: 'tristate' });
-}
-
 /**
 	* Creates a dialog with standard structure
 	* @param {Object} opts - { title, content, buttons, width, onClose, onSettings, preview }
@@ -134,6 +125,7 @@ function createDialog(opts) {
 				<h3>${title}</h3>
 				<div class="spacer"></div>
 				${onSettings ? '<button class="nc-header-settings link-brackets"><span class="inner">SETTINGS</span></button>' : ''}
+				<button class="nc-header-help link-brackets"><span class="inner">?</span></button>
 				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 			</div>
 			${preview ? `<div class="nc-dialog-preview">${preview}</div>` : ''}
@@ -183,6 +175,11 @@ function createDialog(opts) {
 		});
 	}
 
+	const helpBtn = overlay.querySelector('.nc-header-help');
+	if (helpBtn) {
+		helpBtn.addEventListener('click', showHelpDialog);
+	}
+
 	// Close on overlay click or Escape
 	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 	overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
@@ -197,4 +194,78 @@ function createDialog(opts) {
 		querySelector: (sel) => overlay.querySelector(sel),
 		querySelectorAll: (sel) => overlay.querySelectorAll(sel)
 	};
+}
+
+/**
+ * Shows a help dialog explaining how the plugin works
+ */
+function showHelpDialog() {
+	const overlay = document.createElement('div');
+	overlay.className = 'nc-dialog-overlay';
+	overlay.innerHTML = `
+		<div class="nc-dialog" style="min-width: 420px; max-width: 520px;">
+			<div class="nc-dialog-header nc-flex nc-justify-between">
+				<h3>Nick Colors - Help</h3>
+				<div class="spacer"></div>
+				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
+			</div>
+			<div class="nc-dialog-content nc-help-content">
+				<h4>What is this?</h4>
+				<p>A userscript that gives each username a unique, consistent color based on a hash of their name. Colors persist across sessions and pages.</p>
+
+				<h4>Quick Start</h4>
+				<ul>
+					<li><strong>Right-click any username</strong> to customize its color, icon, or style</li>
+					<li><strong>Use the SETTINGS button</strong> to configure global color ranges and options</li>
+				</ul>
+
+				<h4>Settings Overview</h4>
+				<ul>
+					<li><strong>Preset Themes</strong> - Match colors to site themes (VT320, Poetry, etc.)</li>
+					<li><strong>Monochrome Mode</strong> - Use one color for all usernames</li>
+					<li><strong>H/S/L Ranges</strong> - Limit hue, saturation, and lightness ranges</li>
+					<li><strong>Contrast Threshold</strong> - Auto-invert colors for readability (WCAG ratios)</li>
+					<li><strong>Style Variations</strong> - Add bold, italic, small-caps, or icons</li>
+				</ul>
+
+				<h4>Per-User Customization</h4>
+				<ul>
+					<li><strong>Color</strong> - Set via sliders or custom hex/hsl value</li>
+					<li><strong>Icons</strong> - Prepend/append symbols (auto, custom, or disabled)</li>
+					<li><strong>Styles</strong> - Override weight, italic, small-caps per user</li>
+					<li><strong>Inversion</strong> - Force or prevent background inversion</li>
+					<li><strong>Custom CSS</strong> - Add any additional styles</li>
+				</ul>
+
+				<h4>Tips</h4>
+				<ul>
+					<li>Colors are mapped proportionally to your configured ranges</li>
+					<li>Site-wide overrides are loaded in remote from github, but can be overridden locally</li>
+					<li>Export your settings to back them up or share with others</li>
+				</ul>
+
+				<h4>Bugs</h4>
+				<ul>
+					<li>Report issues either on <a href="https://github.com/z0mbieparade/cyberspace-nick-colors/issues" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+					<li>Or use the [SETTINGS] -> [REPORT ISSUE] button</li>
+				</ul>
+			</div>
+			<div class="nc-dialog-footer">
+				<div class="buttons nc-flex nc-items-center nc-gap-2">
+					<button class="nc-close-btn link-brackets"><span class="inner">CLOSE</span></button>
+				</div>
+			</div>
+		</div>
+	`;
+
+	const close = () => overlay.remove();
+
+	overlay.querySelector('.nc-header-close').addEventListener('click', close);
+	overlay.querySelector('.nc-close-btn').addEventListener('click', close);
+	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+	overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+	overlay.setAttribute('tabindex', '-1');
+
+	document.body.appendChild(overlay);
+	overlay.focus();
 }

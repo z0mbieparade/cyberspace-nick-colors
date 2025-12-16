@@ -34,9 +34,9 @@ const DEFAULT_SITE_CONFIG = {
 	useSiteThemeSat: false,      // Match site theme's saturation
 	useSiteThemeLit: false,      // Match site theme's lightness
 
-	singleColorHue: 180,    // Hue for single color mode (0-360)
-	singleColorSat: 85,     // Saturation for single color mode (0-100)
-	singleColorLit: 65,     // Lightness for single color mode (0-100)
+	singleColorHue: 180,    // Hue for monochrome mode (0-360)
+	singleColorSat: 85,     // Saturation for monochrome mode (0-100)
+	singleColorLit: 65,     // Lightness for monochrome mode (0-100)
 	singleColorCustom: '',  // Custom color value (hex or hsl) - overrides H/S/L if set
 
 	satSpread: 15,    // +/- percentage around site theme saturation
