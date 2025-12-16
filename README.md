@@ -31,7 +31,7 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 - **Preset themes** - Quick presets matching cyberspace.online site themes (Dark, Light, C64, VT320, Matrix, etc.)
 - **Site theme integration** - Optionally match your custom site theme's hue, saturation, or lightness
 - **Style variations** - Optionally vary font-weight, italic, and small-caps based on username hash
-- **Prepend icons** - Optionally prepend a hash-based icon from a customizable set to each username
+- **Username icons** - Optionally prepend and/or append a hash-based icon from a customizable set to each username
 - **Per-user overrides** - Right-click any username to set custom color, icon, and style variations
 - **Import/Export** - Backup and restore your settings via file or clipboard
 
