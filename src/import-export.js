@@ -2,7 +2,7 @@
 // EXPORT / IMPORT SETTINGS
 // =====================================================
 
-const EXPORT_VERSION = 1;
+const EXPORT_VERSION = 2;
 
 /**
  * Get only non-default values from an object by comparing to defaults
@@ -38,6 +38,85 @@ function exportSettings() {
 	return data;
 }
 
+// v1 used different full key names for some settings
+// Map old names to new names
+const V1_KEY_RENAMES = {
+	useHueRange: 'useSiteThemeHue',
+	useSaturation: 'useSiteThemeSat',
+	useLightness: 'useSiteThemeLit',
+	saturationSpread: 'satSpread',
+	lightnessSpread: 'litSpread',
+	// excludeRanges is removed in v1.1, will be ignored
+};
+
+/**
+ * Rename v1 keys to v2 keys after expansion
+ */
+function renameV1Keys(obj) {
+	const result = {};
+	for (const [key, value] of Object.entries(obj)) {
+		const newKey = V1_KEY_RENAMES[key] || key;
+		// Skip excludeRanges as it's not used in v1.1
+		if (key === 'excludeRanges') continue;
+		result[newKey] = value;
+	}
+	return result;
+}
+
+/**
+ * Migrate v1 settings format to v2
+ * v1 had separate configs: colorConfig (cc), siteThemeConfig (stc), styleConfig (sc)
+ * v2 unified them all into siteConfig (sc)
+ */
+function migrateV1ToV2(data) {
+	const migrated = { version: 2 };
+	const mergedConfig = {};
+
+	// Handle minified keys (cc, stc, sc)
+	if (data.cc) {
+		// colorConfig: mL, xL, mS, xS, mH, xH, cT, eR
+		Object.assign(mergedConfig, renameV1Keys(maxifyKeys(data.cc)));
+	}
+	if (data.stc) {
+		// siteThemeConfig: hS, sS, lS, uH, uS, uL
+		Object.assign(mergedConfig, renameV1Keys(maxifyKeys(data.stc)));
+	}
+	if (data.sc) {
+		// In v1, sc was styleConfig: vW, vI, vC, pI, aI, iS
+		Object.assign(mergedConfig, renameV1Keys(maxifyKeys(data.sc)));
+	}
+
+	// Handle unminified keys (colorConfig, siteThemeConfig, styleConfig)
+	if (data.colorConfig) {
+		Object.assign(mergedConfig, renameV1Keys(data.colorConfig));
+	}
+	if (data.siteThemeConfig) {
+		Object.assign(mergedConfig, renameV1Keys(data.siteThemeConfig));
+	}
+	if (data.styleConfig) {
+		Object.assign(mergedConfig, renameV1Keys(data.styleConfig));
+	}
+
+	if (Object.keys(mergedConfig).length > 0) {
+		migrated.siteConfig = mergedConfig;
+	}
+
+	// customNickColors structure is the same
+	if (data.cnc) {
+		migrated.customNickColors = maxifyKeys(data.cnc);
+	}
+	if (data.customNickColors) {
+		migrated.customNickColors = data.customNickColors;
+	}
+
+	// Preserve exportedAt if present
+	if (data.at || data.exportedAt) {
+		migrated.exportedAt = data.at || data.exportedAt;
+	}
+
+	return migrated;
+}
+
 /**
  * Import settings from a JSON object
  * @param {Object} data - The imported data
@@ -49,28 +128,45 @@ function importSettings(data) {
 			return { success: false, message: 'Invalid data format' };
 		}
 
-		// Expand minified keys if present
-		data = maxifyKeys(data);
+		// Check for v1 format (has cc, stc, colorConfig, siteThemeConfig, styleConfig, or version 1)
+		const isV1 = data.v === 1 || data.version === 1 ||
+			data.cc || data.stc || data.colorConfig || data.siteThemeConfig || data.styleConfig;
+		if (isV1) {
+			data = migrateV1ToV2(data);
+		} else {
+			// Expand minified keys if present
+			data = maxifyKeys(data);
+		}
 
 		// Validate version (for future compatibility)
 		if (data.version && data.version > EXPORT_VERSION) {
 			return { success: false, message: `Export version ${data.version} is newer than supported version ${EXPORT_VERSION}` };
 		}
 
-		// Import color config
+		// Import site config (mutate in place to preserve references)
 		if (data.siteConfig) {
-			siteConfig = { ...DEFAULT_SITE_CONFIG, ...data.siteConfig };
+			// Clear existing properties
+			for (const key in siteConfig) {
+				delete siteConfig[key];
+			}
+			// Apply defaults then imported values
+			Object.assign(siteConfig, DEFAULT_SITE_CONFIG, data.siteConfig);
 			saveSiteConfig();
 		}
 
-		// Import custom nick colors
+		// Import custom nick colors (mutate in place to preserve references)
 		if (data.customNickColors) {
-			customNickColors = { ...data.customNickColors };
+			// Clear existing properties
+			for (const key in customNickColors) {
+				delete customNickColors[key];
+			}
+			Object.assign(customNickColors, data.customNickColors);
 			saveCustomNickColors();
 		}
 
 		refreshAllColors();
-		return { success: true, message: 'Settings imported successfully' };
+		const migrationNote = isV1 ? ' (migrated from v1)' : '';
+		return { success: true, message: `Settings imported successfully${migrationNote}` };
 	} catch (e) {
 		return { success: false, message: `Import failed: ${e.message}` };
 	}
@@ -93,6 +189,12 @@ const KEY_MAP = {
 	satSpread: 'sS',
 	useSiteThemeLit: 'uL',
 	litSpread: 'lS',
+	// Monochrome mode
+	useSingleColor: 'uSC',
+	singleColorHue: 'sCH',
+	singleColorSat: 'sCS',
+	singleColorLit: 'sCL',
+	singleColorCustom: 'sCC',
 	// Style config
 	varyWeight: 'vW',
 	varyItalic: 'vI',
@@ -112,6 +214,14 @@ const KEY_MAP = {
 	customNickColors: 'cnc',
 	version: 'v',
 	exportedAt: 'at'
+};
+
+// Legacy key mappings from v1 (for import compatibility)
+const LEGACY_KEY_MAP = {
+	cc: 'colorConfig',      // v1: separate color config
+	stc: 'siteThemeConfig', // v1: separate site theme config
+	// Note: 'sc' in v1 was styleConfig, but in v2 it's siteConfig
+	// This is handled specially in migration
 };
 
 // Reverse mapping (short key -> full key)
