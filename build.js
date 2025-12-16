@@ -10,8 +10,9 @@ const OUTPUT_FILE = path.join(__dirname, 'cyberspace-nick-colors.user.js');
 const STYLES_FILE = path.join(SRC_DIR, 'styles.scss');
 const CSS_OUTPUT_FILE = path.join(__dirname, 'tests', 'styles.css');
 
-// Get version from command line or default
-const version = process.argv[2] || '1.0.0';
+// Get version from package.json or command line
+const packageJson = require('./package.json');
+const version = process.argv[2] || packageJson.version;
 const shouldMinify = !process.argv.includes('--no-minify');
 
 console.log(`Building cyberspace-nick-colors.user.js v${version}${shouldMinify ? ' (minified)' : ''}...`);
