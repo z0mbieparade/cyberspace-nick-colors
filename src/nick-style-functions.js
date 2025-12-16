@@ -95,7 +95,7 @@ function getNickBase(username, colorFormat = 'hsl', options = {})
 
 	if (options.effectiveConfig.useSingleColor) 
 	{
-		// Single color mode - use configured single color
+		// Monochrome mode - use configured color
 		let hsl;
 		if (options.effectiveConfig.singleColorCustom) {
 			// Use custom color value if set
@@ -241,7 +241,7 @@ function getMappedNickColor(username, colorFormat = 'hsl', options = {})
 	let mapped = null;
 	let debugData = [];
 
-	// In single color mode, skip range mapping - user chose the exact color
+	// In monochrome mode, skip range mapping - user chose the exact color
 	const skipMapping = options.effectiveConfig.useSingleColor;
 
 	if(options.includeStyles === true)

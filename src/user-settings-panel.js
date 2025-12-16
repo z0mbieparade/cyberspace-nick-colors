@@ -112,7 +112,7 @@ function createUserSettingsPanel(username, currentStyles)
 			${hasRemoteOverride ? `<div class="hint">Site-wide override: <code style="background: var(--nc-code-bg); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
 			${eff.useSingleColor ? `
 			<div class="nc-dialog-info" style="padding: 0.5rem;">
-				Per-user color customization is disabled. All nicks use a single color.<br>
+				Per-user color customization is disabled. Monochrome mode is enabled.<br>
 				<button class="link-brackets" id="picker-open-settings" style="margin-top: 0.5rem;"><span class="inner">Change in Settings</span></button>
 			</div>
 			` : `
@@ -281,7 +281,7 @@ function createUserSettingsPanel(username, currentStyles)
 	
 
 	// Create sliders with restricted range info and live value display in labels
-	// Only create sliders when NOT in single color mode
+	// Only create sliders when NOT in monochrome mode
 	let hueSlider = null, satSlider = null, litSlider = null;
 	if (slidersContainer && !eff.useSingleColor) {
 		const hueLabel = isHueRestricted
@@ -301,7 +301,7 @@ function createUserSettingsPanel(username, currentStyles)
 		slidersContainer.append(hueSlider.el, satSlider.el, litSlider.el);
 	}
 
-	// Handler for "Open Settings" button when in single color mode
+	// Handler for "Open Settings" button when in monochrome mode
 	const openSettingsBtn = dialog.querySelector('#picker-open-settings');
 	if (openSettingsBtn) {
 		openSettingsBtn.addEventListener('click', () => {
@@ -311,7 +311,7 @@ function createUserSettingsPanel(username, currentStyles)
 	}
 
 	function getTextColor() {
-		// In single color mode, return saved color or null (let getNickBase handle it)
+		// In monochrome mode, return saved color or null (let getNickBase handle it)
 		if (eff.useSingleColor || !hueSlider) {
 			return customInput?.value?.trim() || null;
 		}
@@ -320,7 +320,7 @@ function createUserSettingsPanel(username, currentStyles)
 	}
 
 	function updateGradients() {
-		// Skip gradient updates if sliders don't exist (single color mode)
+		// Skip gradient updates if sliders don't exist (monochrome mode)
 		if (!hueSlider || !satSlider || !litSlider) return;
 
 		// Raw slider values (base values)

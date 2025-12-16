@@ -503,6 +503,45 @@
 	flex-shrink: 0;
 }
 
+// Help dialog content
+.nc-help-content {
+	h4 {
+		margin: var(--spacing-sm) 0 var(--spacing-xs);
+		padding-top: var(--spacing-xs);
+		border-top: 1px dotted var(--nc-border);
+
+		&:first-child {
+			margin-top: 0;
+			padding-top: 0;
+			border-top: none;
+		}
+	}
+
+	p {
+		margin: 0 0 var(--spacing-xs);
+		color: var(--nc-fg-dim);
+		font-size: calc(var(--font-size-base) * 0.875);
+		line-height: 1.4;
+	}
+
+	ul {
+		margin: 0 0 var(--spacing-xs);
+		padding-left: 1.25rem;
+		list-style: disc;
+	}
+
+	li {
+		margin: var(--spacing-xs) 0;
+		color: var(--nc-fg-dim);
+		font-size: calc(var(--font-size-base) * 0.875);
+		line-height: 1.4;
+
+		strong {
+			color: var(--nc-fg);
+		}
+	}
+}
+
 // =====================================================
 // SLIDER STYLES
 // =====================================================
