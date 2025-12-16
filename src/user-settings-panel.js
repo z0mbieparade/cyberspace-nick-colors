@@ -305,7 +305,7 @@ function createUserSettingsPanel(username, currentStyles)
 	const openSettingsBtn = dialog.querySelector('#picker-open-settings');
 	if (openSettingsBtn) {
 		openSettingsBtn.addEventListener('click', () => {
-			dialog.closest('.nc-dialog-overlay')?.remove();
+			dialog.close();
 			createSettingsPanel();
 		});
 	}

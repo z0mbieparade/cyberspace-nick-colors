@@ -478,7 +478,7 @@
 		border: 1px solid var(--nc-border);
 		padding: var(--spacing-xs) var(--spacing-sm);
 		background: var(--nc-bg);
-		max-height: calc((var(--font-size-h) * 2 * var(--line-height-base)) + (var(--spacing-xs) * 2));
+		max-height: calc((var(--font-size-h) * 2 * var(--line-height-base)) + (var(--spacing-xs) * 3));
 		overflow: hidden;
 
 		&.preview-inverted
@@ -491,13 +491,9 @@
 	// Preview styles
 	.preview-row {
 		display: flex;
-		gap: .25rem;
+		gap: var(--spacing-xs);
 		flex-wrap: wrap;
 		justify-content: space-around;
-	}
-
-	.preview-nick {
-		padding: 0.125rem 0.25rem !important;
 	}
 }
 

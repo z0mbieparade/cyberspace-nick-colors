@@ -80,6 +80,7 @@ function exportDebug()
  */
 function exportDebugLogs() {
 	const eff = getEffectiveSiteConfig();
+	const themeColors = getThemeColors(null, 'hsl');
 	const lines = [];
 
 	lines.push('='.repeat(60));
@@ -87,14 +88,24 @@ function exportDebugLogs() {
 	lines.push('='.repeat(60));
 	lines.push('');
 	lines.push(`Exported: ${new Date().toISOString()}`);
+	lines.push(`Version: ${VERSION}`);
+	lines.push(`Debug Mode: ${DEBUG}`);
 	lines.push(`URL: ${window.location.href}`);
 	lines.push(`User Agent: ${navigator.userAgent}`);
 	lines.push('');
 
 	lines.push('-'.repeat(60));
-	lines.push('SITE THEME');
+	lines.push('THEME INFO');
 	lines.push('-'.repeat(60));
-	lines.push(`Site Theme: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
+	lines.push(`Site Theme Name: ${siteThemeName || 'none'}`);
+	lines.push(`Site Theme Object: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
+	lines.push(`Site Custom Theme: ${siteCustomTheme ? JSON.stringify(siteCustomTheme) : 'none'}`);
+	lines.push('');
+
+	lines.push('-'.repeat(60));
+	lines.push('THEME COLORS (resolved)');
+	lines.push('-'.repeat(60));
+	lines.push(JSON.stringify(themeColors, null, 2));
 	lines.push('');
 
 	lines.push('-'.repeat(60));
@@ -104,13 +115,7 @@ function exportDebugLogs() {
 	lines.push('');
 
 	lines.push('-'.repeat(60));
-	lines.push('SITE CONFIG');
-	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(siteConfig, null, 2));
-	lines.push('');
-
-	lines.push('-'.repeat(60));
-	lines.push('STYLE CONFIG');
+	lines.push('SAVED SITE CONFIG');
 	lines.push('-'.repeat(60));
 	lines.push(JSON.stringify(siteConfig, null, 2));
 	lines.push('');
@@ -241,5 +246,5 @@ function showReportIssueDialog() {
 	});
 
 	document.body.appendChild(overlay);
-	usernameInput.focus();
+	issueInput.focus();
 }

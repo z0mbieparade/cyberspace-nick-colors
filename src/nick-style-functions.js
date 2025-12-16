@@ -241,6 +241,9 @@ function getMappedNickColor(username, colorFormat = 'hsl', options = {})
 	let mapped = null;
 	let debugData = [];
 
+	// In single color mode, skip range mapping - user chose the exact color
+	const skipMapping = options.effectiveConfig.useSingleColor;
+
 	if(options.includeStyles === true)
 	{
 		if(options.debugData)
@@ -255,7 +258,7 @@ function getMappedNickColor(username, colorFormat = 'hsl', options = {})
 			if(key.startsWith('color'))
 			{
 				mapped[toCamelCase('base-' + key)] = base[key];
-				mapped[key] = applyRangeMappingToColor(base[key], colorFormat, {
+				mapped[key] = skipMapping ? base[key] : applyRangeMappingToColor(base[key], colorFormat, {
 					effectiveConfig: options.effectiveConfig,
 				});
 			}
@@ -269,7 +272,7 @@ function getMappedNickColor(username, colorFormat = 'hsl', options = {})
 	}
 	else
 	{
-		mapped = applyRangeMappingToColor(base, colorFormat, {
+		mapped = skipMapping ? base : applyRangeMappingToColor(base, colorFormat, {
 			effectiveConfig: options.effectiveConfig,
 		})
 	}
