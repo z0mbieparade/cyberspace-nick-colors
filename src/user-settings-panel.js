@@ -8,7 +8,7 @@ function createUserSettingsPanel(username, currentStyles)
 	const eff = getEffectiveSiteConfig();
 	
 	// Filter out color, icon, and style variation properties from CSS string
-	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'invert'];
+	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'fontFamily', 'invert'];
 	const filteredStyles = Object.fromEntries(
 		Object.entries(makeStylesObject(currentStyles)).filter(([key]) => !styleVariationKeys.includes(key))
 	);
@@ -37,6 +37,8 @@ function createUserSettingsPanel(username, currentStyles)
 	const currentItalic = savedStyles.fontStyle;
 	const currentCase = savedStyles.fontVariant;
 	const currentInvert = savedStyles.invert; // true, false, or undefined (auto)
+	const currentFontFamily = savedStyles.fontFamily || '';
+	const currentUserNotes = savedStyles.userNotes || '';
 
 	// Check if user has remote overrides
 	const hasRemoteOverride = MANUAL_OVERRIDES[username];
@@ -164,6 +166,14 @@ function createUserSettingsPanel(username, currentStyles)
 				if (invertState !== null) {
 					styles.invert = invertState;
 				}
+				const fontFamily = engine.getFieldValue('fontFamily')?.trim();
+				if (fontFamily) {
+					styles.fontFamily = fontFamily;
+				}
+				const userNotes = engine.getFieldValue('userNotes')?.trim();
+				if (userNotes) {
+					styles.userNotes = userNotes;
+				}
 				customNickColors[username] = styles;
 				saveCustomNickColors();
 				refreshAllColors();
@@ -189,6 +199,10 @@ function createUserSettingsPanel(username, currentStyles)
 	// Build the schema for engine-managed fields
 	const userSettingsSchema = [
 		{ type: 'hr' },
+		{ type: 'section', label: 'Notes', hint: 'Personal notes about this user (visible on hover)', fields: [
+			{ key: 'userNotes', type: 'textarea', label: '', default: currentUserNotes,
+				placeholder: 'Add personal notes about this user...' },
+		]},
 		{ type: 'section', label: 'Custom Icons', hint: 'Prepend/Append a custom character or emoji to the nickname.', fields: [
 			{ key: 'prependIconEnabled', type: 'tristate', label: 'Prepend icon', default: initialPrependIconState, defaultLabel: hashIcon },
 			{ key: 'prependIconPicker', type: 'custom', showWhen: { field: 'prependIconEnabled', is: true }, render: () => {
@@ -210,6 +224,7 @@ function createUserSettingsPanel(username, currentStyles)
 			{ key: 'fontStyle', type: 'tristate', label: 'Italic', default: currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null, defaultLabel: hashItalic },
 			{ key: 'fontVariant', type: 'tristate', label: 'Small Caps', default: currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null, defaultLabel: hashCase },
 			{ key: 'invert', type: 'tristate', label: 'Invert', default: currentInvert === true ? true : currentInvert === false ? false : null, defaultLabel: 'auto' },
+			{ key: 'fontFamily', type: 'text', label: 'Font Family', default: currentFontFamily, placeholder: 'Comic Sans MS, cursive' },
 		]},
 		{ type: 'section', label: 'Additional CSS', fields: [
 			{ key: 'customCss', type: 'textarea', label: '', default: currentCssString, placeholder: 'background-color: #1a1a2e;\ntext-decoration: underline;', hint: 'CSS properties, one per line' },
@@ -449,6 +464,10 @@ function createUserSettingsPanel(username, currentStyles)
 		if (invertState !== null) {
 			tempStyles.invert = invertState;
 		}
+		const fontFamily = engine.getFieldValue('fontFamily')?.trim();
+		if (fontFamily) {
+			tempStyles.fontFamily = fontFamily;
+		}
 
 		// Temporarily apply dialog state to customNickColors for applyStyles
 		const savedCustom = customNickColors[username];
@@ -573,6 +592,14 @@ function createUserSettingsPanel(username, currentStyles)
 		if (invertState !== null) {
 			styles.invert = invertState;
 		}
+		const fontFamily = engine.getFieldValue('fontFamily')?.trim();
+		if (fontFamily) {
+			styles.fontFamily = fontFamily;
+		}
+		const userNotes = engine.getFieldValue('userNotes')?.trim();
+		if (userNotes) {
+			styles.userNotes = userNotes;
+		}
 		return styles;
 	}
 
@@ -626,8 +653,14 @@ function createUserSettingsPanel(username, currentStyles)
 			const state = settings.fontVariant === 'small-caps' ? true : settings.fontVariant === 'normal' ? false : null;
 			engine.setFieldValue('fontVariant', state);
 		}
+		if (settings.fontFamily) {
+			engine.setFieldValue('fontFamily', settings.fontFamily);
+		}
 		if (settings.invert !== undefined) {
 			engine.setFieldValue('invert', settings.invert);
+		}
+		if (settings.userNotes) {
+			engine.setFieldValue('userNotes', settings.userNotes);
 		}
 		updatePreview();
 	}

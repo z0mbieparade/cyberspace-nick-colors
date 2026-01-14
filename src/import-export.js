@@ -208,6 +208,8 @@ const KEY_MAP = {
 	fontWeight: 'fW',
 	fontStyle: 'fS',
 	fontVariant: 'fV',
+	fontFamily: 'fF',
+	userNotes: 'un',
 	invert: 'inv',
 	// Config sections
 	siteConfig: 'sc',

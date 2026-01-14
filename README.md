@@ -10,7 +10,8 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 
 ## Usage
 
-- **Right-click any colored username** to customize its color
+- **Right-click any colored username** (or long-press on mobile) to customize its color
+  - Add personal notes about a user (visible on hover)
   - Set custom text color via sliders or hex/hsl value
   - Set custom icon (prepended character/emoji)
   - Override style variations (bold, italic, small-caps) with tri-state toggles (auto/on/off)
@@ -32,7 +33,8 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 - **Site theme integration** - Optionally match your custom site theme's hue, saturation, or lightness
 - **Style variations** - Optionally vary font-weight, italic, and small-caps based on username hash
 - **Username icons** - Optionally prepend and/or append a hash-based icon from a customizable set to each username
-- **Per-user overrides** - Right-click any username to set custom color, icon, and style variations
+- **Per-user overrides** - Right-click any username to set custom color, icon, font family, and style variations
+- **User notes** - Add personal notes about users that display on hover (great for remembering who's who)
 - **Import/Export** - Backup and restore your settings via file or clipboard
 
 ## Nick Style Override

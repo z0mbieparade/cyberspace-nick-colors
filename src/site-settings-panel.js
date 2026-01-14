@@ -142,9 +142,12 @@ function createSettingsPanel()
 		]},
 
 		{ type: 'section', label: 'Contrast', fields: [
-			{ type: 'hint', text: 'Auto-invert colors when WCAG contrast ratio is below threshold (0 = disabled, 3 = large text, 4.5 = AA, 7 = AAA)' },
+			{ key: 'contrastEnabled', type: 'toggle', label: 'Enable contrast auto-inversion', default: true },
+			{ type: 'hint', text: 'Auto-invert colors when WCAG contrast ratio is below threshold (3 = large text, 4.5 = AA, 7 = AAA)',
+				showWhen: { field: 'contrastEnabled', is: true } },
 			{ key: 'contrastThreshold', type: 'slider', label: 'Contrast Threshold (WCAG ratio)',
-				min: 0, max: 21, step: 0.5, default: 4.5 },
+				min: 1, max: 21, step: 0.5, default: 4.5,
+				showWhen: { field: 'contrastEnabled', is: true } },
 		]},
 
 		{ type: 'section', label: 'Style Variation', fields: [
@@ -241,6 +244,9 @@ function createSettingsPanel()
 		hueRange: [eff.minHue, eff.maxHue],
 		satRange: [eff.minSaturation, eff.maxSaturation],
 		litRange: [eff.minLightness, eff.maxLightness],
+		// Contrast toggle based on whether threshold is > 0
+		contrastEnabled: eff.contrastThreshold > 0,
+		contrastThreshold: eff.contrastThreshold > 0 ? eff.contrastThreshold : 4.5,
 		debugMode: DEBUG,
 	};
 
@@ -426,11 +432,13 @@ function createSettingsPanel()
 		const themeSettings = getThemeDefaultSettings(switchTheme);
 		if (themeSettings?.settings) {
 			const p = themeSettings.settings;
+			const threshold = p.contrastThreshold ?? 4.5;
 			engine.setValues({
 				hueRange: [p.minHue, p.maxHue],
 				satRange: [p.minSaturation, p.maxSaturation],
 				litRange: [p.minLightness, p.maxLightness],
-				contrastThreshold: p.contrastThreshold || 4.5,
+				contrastEnabled: threshold > 0,
+				contrastThreshold: threshold > 0 ? threshold : 4.5,
 			}, true);
 			updatePreview();
 		}
@@ -457,6 +465,11 @@ function createSettingsPanel()
 			result.maxLightness = vals.litRange[1];
 			delete result.litRange;
 		}
+		// Handle contrast toggle - set threshold to 0 when disabled
+		if (!vals.contrastEnabled) {
+			result.contrastThreshold = 0;
+		}
+		delete result.contrastEnabled;
 		// Don't save debugMode in siteConfig
 		delete result.debugMode;
 		return result;
