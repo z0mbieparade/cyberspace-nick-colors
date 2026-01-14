@@ -3,12 +3,16 @@
 const fs = require('fs');
 const path = require('path');
 const { minify } = require('terser');
+const sass = require('sass');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const OUTPUT_FILE = path.join(__dirname, 'cyberspace-nick-colors.user.js');
+const STYLES_FILE = path.join(SRC_DIR, 'styles.scss');
+const CSS_OUTPUT_FILE = path.join(__dirname, 'tests', 'styles.css');
 
-// Get version from command line or default
-const version = process.argv[2] || '1.0.0';
+// Get version from package.json or command line
+const packageJson = require('./package.json');
+const version = process.argv[2] || packageJson.version;
 const shouldMinify = !process.argv.includes('--no-minify');
 
 console.log(`Building cyberspace-nick-colors.user.js v${version}${shouldMinify ? ' (minified)' : ''}...`);
@@ -33,12 +37,41 @@ const metadata = `// ==UserScript==
 // @run-at       document-idle
 // ==/UserScript==`;
 
+// Compile SCSS to CSS
+let compiledCSS = '';
+if (fs.existsSync(STYLES_FILE)) {
+	try {
+		const result = sass.compile(STYLES_FILE, { style: 'compressed' });
+		compiledCSS = result.css;
+		console.log(`  + styles.scss (${(compiledCSS.length / 1024).toFixed(1)} KB compiled)`);
+		// Also output standalone CSS for visual testing
+		fs.writeFileSync(CSS_OUTPUT_FILE, compiledCSS);
+	} catch (err) {
+		console.error('SCSS compilation failed:', err.message);
+		process.exit(1);
+	}
+} else {
+	console.warn('  Warning: styles.scss not found, skipping styles');
+}
+
+// Style injection code (CSS will be inserted at build time)
+const styleInjection = `
+// Inject compiled styles
+const ncStyles = document.createElement('style');
+ncStyles.id = 'nc-styles';
+ncStyles.textContent = ${JSON.stringify(compiledCSS)};
+document.head.appendChild(ncStyles);
+`;
+
 // Build parts: can be a filename (relative to src/) or a raw string
 const codeParts = [
 	// IIFE wrapper start
 `(function() {
 	'use strict';
 	const VERSION = '${version}';`,
+
+	// Inject compiled styles first
+	styleInjection,
 
 	// Source files (in order)
 	'helper-functions.js',
@@ -50,6 +83,7 @@ const codeParts = [
 	'nick-functions.js',
 	'slider-component.js',
 	'dialog-component.js',
+	'settings-engine.js',
 	'user-settings-panel.js',
 	'site-settings-panel.js',
 	'init.js',

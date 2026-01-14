@@ -1,8 +1,86 @@
+
+
+/**
+	* Creates a debug pre element (hidden when DEBUG is false, but still in DOM for export)
+	* @param {Object|string} data - Object with label/value pairs, or plain string for unlabeled content
+	* @param {string} [classes] - Additional CSS classes
+	* @returns {string} HTML string
+	*/
+function createDebugPre(data, classes = '') {
+	const hiddenStyle = DEBUG ? '' : ' style="display: none;"';
+	const classStr = `nc-dialog-debug${classes ? ' ' + classes : ''}`;
+	if (typeof data === 'string') {
+		return `<div class="${classStr}"${hiddenStyle}>${data}</div>`;
+	}
+	console.log(data);
+	const lines = Object.entries(data)
+		.map(([label, value]) => {
+			if(typeof value === 'object' && (value.txt !== undefined || value.elem !== undefined))
+				return `<span><strong>${label}:</strong><span>${value.txt ?? ' N/A'}${value.elem ? ' ' + value.elem : ''}</span></span>`;
+			else if(typeof value === 'string')
+				return `<span><strong>${label}:</strong><span>${value ?? 'N/A'}</span></span>`;
+		})
+		.filter(line => line && line.trim() !== '')
+		.join('\n').trim();
+	return `<div class="${classStr}"${hiddenStyle}>\n${lines}\n</div>`;
+}
+
+/**
+	* Gets or creates a debug pre element under a parent (for dynamic updates)
+	* @param {HTMLElement} parent - Parent element to append to
+	* @param {string} [classes] - Additional CSS classes
+	* @returns {HTMLElement} The debug element (hidden if DEBUG is false)
+	*/
+function getOrCreateDebugPre(parent, classes = '') {
+	let debug = parent.querySelector('.nc-dynamic-debug');
+	if (!debug) {
+		debug = document.createElement('div');
+		debug.className = `nc-dynamic-debug nc-dialog-debug${classes ? ' ' + classes : ''}`;
+		parent.appendChild(debug);
+	}
+	debug.style.display = DEBUG ? '' : 'none';
+	return debug;
+}
+
+function logDebug(id, data)
+{
+	DEBUG_LOG.push({
+		timestamp: new Date().toISOString(),
+		id, data
+	})
+}
+
+function exportDebug()
+{
+	if(!DEBUG_LOG)
+	{
+		alert("An error has occurred, please try again later");
+		return;
+	}
+
+	logDebug('Info', {
+		browser: navigator.userAgent,
+		url: window.location.href,
+		version: VERSION,
+	});
+
+	logDebug('Site Theme', siteTheme);
+	logDebug('Site Config', siteConfig);
+	logDebug('Effective Site Config', getEffectiveSiteConfig());
+	logDebug('Style Config', siteConfig);
+	logDebug('Custom Nick Colors', customNickColors);
+	logDebug('Manual Overrides', MANUAL_OVERRIDES);
+
+	console.log("Exporting debug info...");
+	console.log(DEBUG_LOG);
+}
+
 /**
  * Export debug logs for troubleshooting (returns plain text)
  */
 function exportDebugLogs() {
-	const eff = getEffectiveColorConfig();
+	const eff = getEffectiveSiteConfig();
+	const themeColors = getThemeColors(null, 'hsl');
 	const lines = [];
 
 	lines.push('='.repeat(60));
@@ -10,21 +88,24 @@ function exportDebugLogs() {
 	lines.push('='.repeat(60));
 	lines.push('');
 	lines.push(`Exported: ${new Date().toISOString()}`);
+	lines.push(`Version: ${VERSION}`);
+	lines.push(`Debug Mode: ${DEBUG}`);
 	lines.push(`URL: ${window.location.href}`);
 	lines.push(`User Agent: ${navigator.userAgent}`);
 	lines.push('');
 
 	lines.push('-'.repeat(60));
-	lines.push('SITE THEME');
+	lines.push('THEME INFO');
 	lines.push('-'.repeat(60));
-	lines.push(`Site Theme: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
-	lines.push(`Site Theme HSL: ${siteThemeHsl ? JSON.stringify(siteThemeHsl) : 'none'}`);
+	lines.push(`Site Theme Name: ${siteThemeName || 'none'}`);
+	lines.push(`Site Theme Object: ${siteTheme ? JSON.stringify(siteTheme) : 'none'}`);
+	lines.push(`Site Custom Theme: ${siteCustomTheme ? JSON.stringify(siteCustomTheme) : 'none'}`);
 	lines.push('');
 
 	lines.push('-'.repeat(60));
-	lines.push('COLOR CONFIG');
+	lines.push('THEME COLORS (resolved)');
 	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(colorConfig, null, 2));
+	lines.push(JSON.stringify(themeColors, null, 2));
 	lines.push('');
 
 	lines.push('-'.repeat(60));
@@ -34,15 +115,9 @@ function exportDebugLogs() {
 	lines.push('');
 
 	lines.push('-'.repeat(60));
-	lines.push('SITE THEME CONFIG');
+	lines.push('SAVED SITE CONFIG');
 	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(siteThemeConfig, null, 2));
-	lines.push('');
-
-	lines.push('-'.repeat(60));
-	lines.push('STYLE CONFIG');
-	lines.push('-'.repeat(60));
-	lines.push(JSON.stringify(styleConfig, null, 2));
+	lines.push(JSON.stringify(siteConfig, null, 2));
 	lines.push('');
 
 	lines.push('-'.repeat(60));
@@ -90,20 +165,20 @@ function showReportIssueDialog() {
 				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 			</div>
 			<div class="nc-dialog-content">
-				<div class="hint" style="margin-bottom: 0.75rem;">Fill out the fields below to report an issue. All fields are required.</div>
-				<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+				<div class="hint">Fill out the fields below to report an issue. All fields are required.</div>
+				<div class="nc-input-row">
 					<label for="report-issue">What issue are you experiencing?</label>
 					<textarea id="report-issue" placeholder="Describe the problem..." style="width: 100%; min-height: 60px;"></textarea>
 				</div>
-				<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+				<div class="nc-input-row">
 					<label for="report-steps">Steps to reproduce:</label>
 					<textarea id="report-steps" placeholder="1. Go to...\n2. Click on...\n3. See error..." style="width: 100%; min-height: 60px;"></textarea>
 				</div>
-				<div class="nc-input-row" style="margin-bottom: 0.5rem;">
+				<div class="nc-input-row">
 					<label for="report-errors">Any error messages? (check browser console)</label>
 					<input type="text" id="report-errors" placeholder="Optional - paste any errors" style="width: 100%;">
 				</div>
-				<div class="hint" style="margin-top: 0.5rem; font-size: 0.7rem;">Debug info will be automatically included.</div>
+				<div class="hint">Debug info will be automatically included.</div>
 			</div>
 			<div class="nc-dialog-footer">
 				<div class="buttons nc-flex nc-items-center nc-gap-2">
@@ -140,14 +215,13 @@ function showReportIssueDialog() {
 		}
 
 		// Build condensed debug info
-		const eff = getEffectiveColorConfig();
+		const eff = getEffectiveSiteConfig();
 		const debugInfo = `v${VERSION} | ${Object.keys(customNickColors).length} custom | H:${eff.minHue}-${eff.maxHue} S:${eff.minSaturation}-${eff.maxSaturation} L:${eff.minLightness}-${eff.maxLightness}`;
 
 		// Build condensed settings object
 		const settings = {
-			color: colorConfig,
-			siteTheme: siteThemeConfig,
-			style: styleConfig
+			siteConfig: siteConfig,
+			style: siteConfig
 		};
 
 		// Build message
@@ -172,5 +246,5 @@ function showReportIssueDialog() {
 	});
 
 	document.body.appendChild(overlay);
-	usernameInput.focus();
+	issueInput.focus();
 }

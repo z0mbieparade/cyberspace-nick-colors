@@ -97,6 +97,7 @@ function isLikelyUsername(element) {
 
 function colorizeAll() {
 	const selector = USERNAME_SELECTORS.join(', ');
+
 	document.querySelectorAll(selector).forEach(el => {
 		if (!isLikelyUsername(el)) return;
 
@@ -188,39 +189,17 @@ function colorizeMentions() {
 
 			// Create colored span for the mention
 			const span = document.createElement('span');
-			// Prepend/append icon if enabled
-			const icons = getIconsForUsername(m.username);
-			let displayText = m.full;
-			if (icons.prepend) displayText = icons.prepend + ' ' + displayText;
-			if (icons.append) displayText = displayText + ' ' + icons.append;
-			span.textContent = displayText;
-			span.dataset.mentionColored = 'true';
-			span.dataset.username = m.username;
-			if (icons.prepend || icons.append) span.dataset.iconApplied = 'true';
+			span.textContent = m.full;
 
-			// Apply styles
-			const styles = generateStyles(m.username);
-
-			// Check if in inverted container
 			const isInverted = INVERTED_CONTAINERS.length > 0 &&
-				textNode.parentElement?.closest(INVERTED_CONTAINERS.join(', '));
+				!!textNode.parentElement?.closest(INVERTED_CONTAINERS.join(', '));
 
-			if (isInverted) {
-				if (styles.backgroundColor) {
-					// Already inverted by contrast threshold - reverse it back
-					styles.color = styles.backgroundColor;
-					delete styles.backgroundColor;
-					delete styles.padding;
-				} else if (styles.color) {
-					// Normal color - invert for container
-					// Use --color-bg for text since container background is already inverted (light)
-					styles.backgroundColor = styles.color;
-					styles.color = 'var(--color-bg, #000)';
-					styles.padding = '0 0.25rem';
-				}
-			}
+			applyStyles(span, m.username, {
+				matchType: 'mention',
+				isInverted
+			});
 
-			Object.assign(span.style, styles);
+			//  Object.assign(span.style, styles);
 			fragment.appendChild(span);
 
 			lastIndex = m.index + m.full.length;
