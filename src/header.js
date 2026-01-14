@@ -19,6 +19,16 @@ function saveDebugMode() {
 // Host your overrides.json on GitHub, Gist, or any CORS-friendly location
 const OVERRIDES_URL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/overrides.json';
 
+// Update check - stores remote version if newer, null if not checked, false if up to date
+let UPDATE_AVAILABLE = null; // null = not checked, false = up to date, string = new version
+
+// GM_xmlhttpRequest compatibility - support both Tampermonkey (GM_xmlhttpRequest) and Greasemonkey 4+ (GM.xmlHttpRequest)
+const gmXmlHttpRequest = (typeof GM_xmlhttpRequest !== 'undefined')
+	? GM_xmlhttpRequest
+	: (typeof GM !== 'undefined' && typeof GM.xmlHttpRequest === 'function')
+		? GM.xmlHttpRequest
+		: null;
+
 // Manual color overrides - set specific users to specific styles
 // Format: 'username': { ...CSS style properties }
 // Or simple format: 'username': 'css-color' (text color only)

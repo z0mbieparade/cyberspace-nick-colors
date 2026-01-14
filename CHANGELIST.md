@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.4] - 2026-01-14
+
+### Added
+- **Update indicator** - Version in dialog footer highlights when update available; click to install
+- **Greasemonkey 4+ support** - Added `GM.xmlHttpRequest` compatibility for newer Greasemonkey versions
+
+### Fixed
+- Added `github.com` to `@connect` list for overrides.json fetch (was causing "not part of @connect list" error)
+
 ## [1.2.2] - 2026-01-13
 
 ### Added
