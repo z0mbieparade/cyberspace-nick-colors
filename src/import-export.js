@@ -209,6 +209,7 @@ const KEY_MAP = {
 	fontStyle: 'fS',
 	fontVariant: 'fV',
 	fontFamily: 'fF',
+	customFontFamily: 'cFF',
 	userNotes: 'un',
 	invert: 'inv',
 	// Config sections
