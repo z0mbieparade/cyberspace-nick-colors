@@ -8,7 +8,7 @@ function createUserSettingsPanel(username, currentStyles)
 	const eff = getEffectiveSiteConfig();
 	
 	// Filter out color, icon, and style variation properties from CSS string
-	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'invert'];
+	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'fontFamily', 'invert'];
 	const filteredStyles = Object.fromEntries(
 		Object.entries(makeStylesObject(currentStyles)).filter(([key]) => !styleVariationKeys.includes(key))
 	);
@@ -37,6 +37,7 @@ function createUserSettingsPanel(username, currentStyles)
 	const currentItalic = savedStyles.fontStyle;
 	const currentCase = savedStyles.fontVariant;
 	const currentInvert = savedStyles.invert; // true, false, or undefined (auto)
+	const currentFontFamily = savedStyles.fontFamily || '';
 
 	// Check if user has remote overrides
 	const hasRemoteOverride = MANUAL_OVERRIDES[username];
@@ -164,6 +165,10 @@ function createUserSettingsPanel(username, currentStyles)
 				if (invertState !== null) {
 					styles.invert = invertState;
 				}
+				const fontFamily = engine.getFieldValue('fontFamily')?.trim();
+				if (fontFamily) {
+					styles.fontFamily = fontFamily;
+				}
 				customNickColors[username] = styles;
 				saveCustomNickColors();
 				refreshAllColors();
@@ -210,6 +215,7 @@ function createUserSettingsPanel(username, currentStyles)
 			{ key: 'fontStyle', type: 'tristate', label: 'Italic', default: currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null, defaultLabel: hashItalic },
 			{ key: 'fontVariant', type: 'tristate', label: 'Small Caps', default: currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null, defaultLabel: hashCase },
 			{ key: 'invert', type: 'tristate', label: 'Invert', default: currentInvert === true ? true : currentInvert === false ? false : null, defaultLabel: 'auto' },
+			{ key: 'fontFamily', type: 'text', label: 'Font Family', default: currentFontFamily, placeholder: 'Comic Sans MS, cursive' },
 		]},
 		{ type: 'section', label: 'Additional CSS', fields: [
 			{ key: 'customCss', type: 'textarea', label: '', default: currentCssString, placeholder: 'background-color: #1a1a2e;\ntext-decoration: underline;', hint: 'CSS properties, one per line' },
@@ -449,6 +455,10 @@ function createUserSettingsPanel(username, currentStyles)
 		if (invertState !== null) {
 			tempStyles.invert = invertState;
 		}
+		const fontFamily = engine.getFieldValue('fontFamily')?.trim();
+		if (fontFamily) {
+			tempStyles.fontFamily = fontFamily;
+		}
 
 		// Temporarily apply dialog state to customNickColors for applyStyles
 		const savedCustom = customNickColors[username];
@@ -573,6 +583,10 @@ function createUserSettingsPanel(username, currentStyles)
 		if (invertState !== null) {
 			styles.invert = invertState;
 		}
+		const fontFamily = engine.getFieldValue('fontFamily')?.trim();
+		if (fontFamily) {
+			styles.fontFamily = fontFamily;
+		}
 		return styles;
 	}
 
@@ -625,6 +639,9 @@ function createUserSettingsPanel(username, currentStyles)
 		if (settings.fontVariant !== undefined) {
 			const state = settings.fontVariant === 'small-caps' ? true : settings.fontVariant === 'normal' ? false : null;
 			engine.setFieldValue('fontVariant', state);
+		}
+		if (settings.fontFamily) {
+			engine.setFieldValue('fontFamily', settings.fontFamily);
 		}
 		if (settings.invert !== undefined) {
 			engine.setFieldValue('invert', settings.invert);
