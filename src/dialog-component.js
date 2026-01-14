@@ -2,253 +2,7 @@
 // DIALOG UI COMPONENT
 // =====================================================
 
-// Shared dialog styles (injected once)
-const dialogStyles = document.createElement('style');
-dialogStyles.textContent = `
-	.nc-dialog-overlay {
-		position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-		background: rgba(0,0,0,0.7); display: flex;
-		align-items: center; justify-content: center; z-index: 999999;
-	}
-	.nc-dialog {
-		background: var(--color-bg, #0a0a0a); 
-		border: 1px solid var(--color-border, #333);
-		color: var(--color-fg, #eee); 
-		max-height: 80vh; display: flex; flex-direction: column;
-	}
-	.nc-dialog .spacer {
-		flex: 1;
-	}
-	.nc-dialog-header {
-		padding: 1rem 1rem 0.5rem; 
-		border-bottom: 1px solid var(--color-border, #333);
-		flex-shrink: 0;
-		width: 100%; 
-		box-sizing: border-box;
-		gap: 0.5rem;
-	}
-	.nc-dialog-content {
-		padding: 0.5rem 1rem; overflow-y: auto; flex: 1;
-	}
-	.nc-dialog-preview {
-		padding: 0.5rem 1rem;
-		border-bottom: 1px solid var(--color-border, #333);
-		flex-shrink: 0;
-		background: var(--color-bg, #0a0a0a);
-	}
-	.nc-dialog-preview .preview,
-	.nc-dialog-preview .preview-row {
-		margin: 0;
-		background-color: var(--color-code-bg, #222);
-		border: 1px solid var(--color-border, #333);
-		padding: 0.5rem; 
-		margin: 0.75rem 0;
-		font-size: 0.875rem; 
-	}
-	.nc-dialog .preview-row {
-		display: flex; 
-		gap: 0.5rem; 
-		flex-wrap: wrap; 
-		justify-content: space-around;
-	}
-	.nc-dialog .preview-nick { padding: 0.125rem 0.25rem !important; }
-	.nc-dialog-footer {
-		padding: 0.5rem 1rem .5rem; 
-		border-top: 1px solid var(--color-border, #333);
-		flex-shrink: 0;
-	}
-	.nc-dialog h3 {
-		margin: 0; color: var(--color-fg, #fff); font-size: 0.875rem;
-		text-transform: uppercase; letter-spacing: 0.05em;
-	}
-	.nc-dialog h4 {
-		margin: 0.5rem 0; color: var(--color-fg, #FFF); 
-		font-size: 0.75rem;
-		text-transform: uppercase; letter-spacing: 0.1em;
-	}
-	.nc-dialog h4:first-child { margin-top: 0; padding-top: 0; }
-	.nc-dialog hr {
-		border: 1px dashed var(--color-border, #333); 
-		background: transparent;
-		height: 0;
-		margin: 1rem 0;
-	}
-	.nc-dialog .nc-input-row, .nc-dialog .nc-input-row-stacked
-	{
-		padding: 0.5rem 0;
-		display: flex;
-		flex-direction: row;
-		gap: 0.5rem;
-	}
-	.nc-dialog .nc-input-row-stacked
-	{
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-	.nc-dialog .nc-input-row.no-padding-bottom, 
-	.nc-dialog .nc-input-row-stacked.no-padding-bottom
-	{
-		padding-bottom: 0;
-	}
-	.nc-dialog .nc-input-row.no-padding-top, 
-	.nc-dialog .nc-input-row-stacked.no-padding-top
-	{
-		padding-top: 0;
-	}
-	.nc-dialog .nc-input-row label
-	{
-		font-size: 0.75rem;
-		color: var(--color-fg, #fff);
-	}
-	.nc-dialog .nc-input-row .hint
-	{
-		font-size: 0.6rem;
-		color: var(--color-fg-dim, #fff);
-	}
-	.nc-dialog .buttons { 
-		display: flex; 
-		gap: 0.5rem; 
-		justify-content: flex-end;
-	}
-	.nc-dialog button {
-		flex: 1 0 auto;
-		padding: 0.5rem;
-	}
-	.nc-dialog button:hover { border-color: var(--color-fg-dim, #666); }
-	.nc-dialog button.link-brackets {
-		background: none; 
-		border: none; 
-		padding: 0;
-		color: var(--color-fg-dim, #888);
-		flex: 0 0 auto;
-	}
-	.nc-dialog button.link-brackets:hover { border-color: var(--color-fg, #FFF); }
-	.nc-dialog button.link-brackets .inner::before {
-		content: "[";
-	}
-	.nc-dialog button.link-brackets .inner::after {
-		content: "]";
-	}
-	.nc-dialog button.nc-inline-btn {
-		flex: 0 0 auto;
-		padding: 0.25rem 0.75rem;
-		font-size: 0.75rem;
-		background: var(--color-bg, #0a0a0a);
-		border: 1px solid var(--color-border, #333);
-		color: var(--color-fg-dim, #888);
-		cursor: pointer;
-		transition: border-color 0.15s, color 0.15s;
-	}
-	.nc-dialog button.nc-inline-btn:hover {
-		border-color: var(--color-fg, #fff);
-		color: var(--color-fg, #fff);
-	}
-	.nc-dialog input[type="text"], .nc-dialog textarea, .nc-dialog select {
-		width: 100%; padding: 0.5rem; background: var(--color-bg, #0a0a0a);
-		border: 1px solid var(--color-border, #333); color: var(--color-fg, #fff);
-		font-family: inherit; font-size: 0.75rem; box-sizing: border-box;
-	}
-	.nc-dialog textarea { min-height: 70px; resize: vertical; }
-	.nc-dialog .nc-toggle { display: flex; margin: 0.5rem 0; }
-	.nc-dialog .hint { font-size: 0.625rem; color: var(--color-fg-dim, #666); margin-top: 0.25rem; }
-
-	/* Toggle component styles */
-	.nc-dialog .nc-toggle-label {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.75rem;
-		cursor: pointer;
-		flex-shrink: 0;
-	}
-	.nc-dialog .nc-toggle-value {
-		font-size: 0.75rem;
-		color: var(--color-fg-dim, #888);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-	.nc-dialog .nc-toggle-track {
-		position: relative;
-		width: 2.5rem;
-		height: 1.25rem;
-		border: 1px solid var(--color-border, #333);
-		border-radius: var(--radius-md);
-		transition: background-color 0.15s;
-	}
-	.nc-dialog .nc-toggle-track.active {
-		background: var(--color-fg, #fff);
-	}
-	.nc-dialog .nc-toggle-track:not(.active) {
-		background: var(--color-fg-dim, #666);
-	}
-	.nc-dialog .nc-toggle-thumb {
-		position: absolute;
-		top: 2px;
-		width: 1rem;
-		height: 0.875rem;
-		background: var(--color-bg, #0a0a0a);
-		border-radius: var(--radius-md);
-		transition: transform 0.15s;
-	}
-	.nc-dialog .nc-toggle-thumb.pos-start { transform: translateX(2px); }
-	.nc-dialog .nc-toggle-thumb.pos-middle { transform: translateX(10px); }
-	.nc-dialog .nc-toggle-thumb.pos-end { transform: translateX(20px); }
-	.nc-dialog .nc-sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		border: 0;
-	}
-	.nc-dialog .nc-text-dim {
-		color: var(--color-fg-dim, #888);
-	}
-
-	.nc-dialog .nc-dialog-attribution {
-		width: 100%;
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.5rem;
-		border-top: 1px dotted var(--color-border, #333);
-		margin-top: 0.3rem; font-size: 0.625rem; color: var(--color-fg-dim, #666);
-		padding-top: 0.3rem;
-	}
-	
-	.nc-dialog .nc-dialog-warning {
-		color: rgba(255, 183, 0, 0.7);
-	}
-
-	/* Layout utility classes */
-	.nc-dialog .nc-flex { display: flex; }
-	.nc-dialog .nc-flex-wrap { flex-wrap: wrap; }
-	.nc-dialog .nc-flex-shrink-0 { flex-shrink: 0; }
-	.nc-dialog .nc-items-center { align-items: center; }
-	.nc-dialog .nc-justify-between { justify-content: space-between; }
-	.nc-dialog .nc-gap-2 { gap: 0.5rem; }
-	.nc-dialog .nc-gap-3 { gap: 0.75rem; }
-	.nc-dialog .nc-gap-4 { gap: 1rem; }
-	.nc-dialog .nc-cursor-pointer { cursor: pointer; }
-	.nc-dialog .nc-dialog-attribution a {
-		color: var(--color-fg-dim, #666); text-decoration: none;
-	}
-	.nc-dialog pre 
-	{
-		white-space: pre-wrap;
-		word-wrap: break-word;
-		overflow-wrap: break-word;
-		max-width: 100%;
-		background-color: var(--color-code-bg, #222);
-		color: var(--color-fg, #fff);
-		padding: 0.5rem;
-	}
-	.nc-dialog pre.nc-dialog-debug 
-	{
-		border: 2px dashed var(--color-border, #333);
-	}
-`;
-document.head.appendChild(dialogStyles);
+// Styles are now in src/styles.scss and compiled during build
 
 // =====================================================
 // INPUT ROW HELPER FUNCTIONS
@@ -352,56 +106,15 @@ function createInputRow(opts) {
 	return '';
 }
 
-// Legacy helper functions that delegate to createInputRow
-function createToggleRow(opts) {
-	return createInputRow({ ...opts, type: 'toggle' });
-}
-
-function createTriStateToggleRow(opts) {
-	return createInputRow({ ...opts, type: 'tristate' });
-}
-
-/**
-	* Creates a debug pre element (hidden when DEBUG is false, but still in DOM for export)
-	* @param {Object|string} data - Object with label/value pairs, or plain string for unlabeled content
-	* @param {string} [classes] - Additional CSS classes
-	* @returns {string} HTML string
-	*/
-function createDebugPre(data, classes = '') {
-	const hiddenStyle = DEBUG ? '' : ' style="display: none;"';
-	const classStr = `nc-dialog-debug${classes ? ' ' + classes : ''}`;
-	if (typeof data === 'string') {
-		return `<pre class="${classStr}"${hiddenStyle}>${data}</pre>`;
-	}
-	const lines = Object.entries(data)
-		.map(([label, value]) => `<strong>${label}:</strong> ${value ?? 'N/A'}`)
-		.join('\n');
-	return `<pre class="${classStr}"${hiddenStyle}>\n${lines}\n</pre>`;
-}
-
-/**
-	* Gets or creates a debug pre element under a parent (for dynamic updates)
-	* @param {HTMLElement} parent - Parent element to append to
-	* @param {string} [classes] - Additional CSS classes
-	* @returns {HTMLElement} The debug element (hidden if DEBUG is false)
-	*/
-function getOrCreateDebugPre(parent, classes = '') {
-	let debug = parent.querySelector('.nc-dynamic-debug');
-	if (!debug) {
-		debug = document.createElement('pre');
-		debug.className = `nc-dynamic-debug nc-dialog-debug${classes ? ' ' + classes : ''}`;
-		parent.appendChild(debug);
-	}
-	debug.style.display = DEBUG ? '' : 'none';
-	return debug;
-}
-
 /**
 	* Creates a dialog with standard structure
 	* @param {Object} opts - { title, content, buttons, width, onClose, onSettings, preview }
 	* @returns {Object} - { el, close, querySelector, querySelectorAll }
 	*/
 function createDialog(opts) {
+	// Refresh CSS variables in case theme changed
+	initCssVariables();
+
 	const { title, content, buttons = [], width = '400px', onClose, onSettings, preview = '' } = opts;
 
 	const overlay = document.createElement('div');
@@ -412,6 +125,7 @@ function createDialog(opts) {
 				<h3>${title}</h3>
 				<div class="spacer"></div>
 				${onSettings ? '<button class="nc-header-settings link-brackets"><span class="inner">SETTINGS</span></button>' : ''}
+				<button class="nc-header-help link-brackets"><span class="inner">?</span></button>
 				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
 			</div>
 			${preview ? `<div class="nc-dialog-preview">${preview}</div>` : ''}
@@ -424,12 +138,9 @@ function createDialog(opts) {
 				</div>
 				<div class="nc-dialog-attribution hint">
 					<span>created by <a href="/z0ylent">@z0ylent</a></span>
-					<span> | </span>
 					<span><a href="https://z0m.bi" target="_blank">https://z0m.bi</a></span>
-					<span> | </span>
 					<span><a class="github-link" href="https://github.com/z0mbieparade/cyberspace-nick-colors" target="_blank" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" height="14px"> <path fill="currentColor" d="M5 2h4v2H7v2H5V2Zm0 10H3V6h2v6Zm2 2H5v-2h2v2Zm2 2v-2H7v2H3v-2H1v2h2v2h4v4h2v-4h2v-2H9Zm0 0v2H7v-2h2Zm6-12v2H9V4h6Zm4 2h-2V4h-2V2h4v4Zm0 6V6h2v6h-2Zm-2 2v-2h2v2h-2Zm-2 2v-2h2v2h-2Zm0 2h-2v-2h2v2Zm0 0h2v4h-2v-4Z"/> </svg></a></span>
-					<span> | </span>
-					<span>v${VERSION}</span><br />
+					<span>v${VERSION}</span>
 				</div>
 				<hr />
 				<div class="buttons nc-flex nc-flex-wrap nc-items-center nc-gap-2">
@@ -464,6 +175,11 @@ function createDialog(opts) {
 		});
 	}
 
+	const helpBtn = overlay.querySelector('.nc-header-help');
+	if (helpBtn) {
+		helpBtn.addEventListener('click', showHelpDialog);
+	}
+
 	// Close on overlay click or Escape
 	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 	overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
@@ -478,4 +194,78 @@ function createDialog(opts) {
 		querySelector: (sel) => overlay.querySelector(sel),
 		querySelectorAll: (sel) => overlay.querySelectorAll(sel)
 	};
+}
+
+/**
+ * Shows a help dialog explaining how the plugin works
+ */
+function showHelpDialog() {
+	const overlay = document.createElement('div');
+	overlay.className = 'nc-dialog-overlay';
+	overlay.innerHTML = `
+		<div class="nc-dialog" style="min-width: 420px; max-width: 520px;">
+			<div class="nc-dialog-header nc-flex nc-justify-between">
+				<h3>Nick Colors - Help</h3>
+				<div class="spacer"></div>
+				<button class="nc-header-close link-brackets"><span class="inner">ESC</span></button>
+			</div>
+			<div class="nc-dialog-content nc-help-content">
+				<h4>What is this?</h4>
+				<p>A userscript that gives each username a unique, consistent color based on a hash of their name. Colors persist across sessions and pages.</p>
+
+				<h4>Quick Start</h4>
+				<ul>
+					<li><strong>Right-click any username</strong> to customize its color, icon, or style</li>
+					<li><strong>Use the SETTINGS button</strong> to configure global color ranges and options</li>
+				</ul>
+
+				<h4>Settings Overview</h4>
+				<ul>
+					<li><strong>Preset Themes</strong> - Match colors to site themes (VT320, Poetry, etc.)</li>
+					<li><strong>Monochrome Mode</strong> - Use one color for all usernames</li>
+					<li><strong>H/S/L Ranges</strong> - Limit hue, saturation, and lightness ranges</li>
+					<li><strong>Contrast Threshold</strong> - Auto-invert colors for readability (WCAG ratios)</li>
+					<li><strong>Style Variations</strong> - Add bold, italic, small-caps, or icons</li>
+				</ul>
+
+				<h4>Per-User Customization</h4>
+				<ul>
+					<li><strong>Color</strong> - Set via sliders or custom hex/hsl value</li>
+					<li><strong>Icons</strong> - Prepend/append symbols (auto, custom, or disabled)</li>
+					<li><strong>Styles</strong> - Override weight, italic, small-caps per user</li>
+					<li><strong>Inversion</strong> - Force or prevent background inversion</li>
+					<li><strong>Custom CSS</strong> - Add any additional styles</li>
+				</ul>
+
+				<h4>Tips</h4>
+				<ul>
+					<li>Colors are mapped proportionally to your configured ranges</li>
+					<li>Site-wide overrides are loaded in remote from github, but can be overridden locally</li>
+					<li>Export your settings to back them up or share with others</li>
+				</ul>
+
+				<h4>Bugs</h4>
+				<ul>
+					<li>Report issues either on <a href="https://github.com/z0mbieparade/cyberspace-nick-colors/issues" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+					<li>Or use the [SETTINGS] -> [REPORT ISSUE] button</li>
+				</ul>
+			</div>
+			<div class="nc-dialog-footer">
+				<div class="buttons nc-flex nc-items-center nc-gap-2">
+					<button class="nc-close-btn link-brackets"><span class="inner">CLOSE</span></button>
+				</div>
+			</div>
+		</div>
+	`;
+
+	const close = () => overlay.remove();
+
+	overlay.querySelector('.nc-header-close').addEventListener('click', close);
+	overlay.querySelector('.nc-close-btn').addEventListener('click', close);
+	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+	overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+	overlay.setAttribute('tabindex', '-1');
+
+	document.body.appendChild(overlay);
+	overlay.focus();
 }

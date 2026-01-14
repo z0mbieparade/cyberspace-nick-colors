@@ -2,72 +2,7 @@
 // SLIDER UI COMPONENT
 // =====================================================
 
-// Shared slider styles (injected once)
-const sliderStyles = document.createElement('style');
-sliderStyles.textContent = `
-	.nc-slider { position: relative; height: 24px; margin: 0.5rem 0; }
-	.nc-slider-track {
-		position: absolute;
-		inset: 4px 0;
-		border: 1px solid var(--color-border, #333);
-		background: var(--color-code-bg, #444);
-		box-sizing: border-box;
-	}
-	/* Mapped track hidden by default */
-	.nc-slider .nc-slider-track-mapped {
-		display: none;
-		position: absolute;
-		top: 4px;
-		bottom: calc(50% + 1px);
-		left: 0;
-		right: 0;
-		border: 1px solid var(--color-border, #333);
-		background: var(--color-code-bg, #444);
-		box-sizing: border-box;
-	}
-	/* Split track for showing mapped vs full range - taller with gap */
-	.nc-slider.nc-slider-split { height: 34px; }
-	.nc-slider.nc-slider-split .nc-slider-track {
-		top: calc(50% + 1px);
-		bottom: 4px;
-	}
-	.nc-slider.nc-slider-split .nc-slider-track-mapped {
-		display: block !important;
-	}
-	.nc-slider-thumb {
-		position: absolute; top: 0; width: 14px; height: 22px;
-		background: var(--color-fg, #fff);
-		border: 2px solid var(--color-bg, #000);
-		outline: 1px solid var(--color-border, #333);
-		cursor: ew-resize; transform: translateX(-50%); z-index: 2;
-		display: flex; align-items: center; justify-content: center;
-		font-size: 8px;
-		color: var(--color-bg, #000); user-select: none;
-		box-sizing: border-box;
-	}
-	.nc-slider.nc-slider-split .nc-slider-thumb { height: 32px; }
-	.nc-slider-labels {
-		display: flex; justify-content: space-between; margin-top: 2px;
-		font-size: 0.625rem; color: var(--color-fg-dim, #888);
-	}
-	/* Simple single-value slider style */
-	.nc-slider.nc-slider-simple { height: 16px; }
-	.nc-slider-simple .nc-slider-track {
-		inset: 7px 0; height: 2px;
-		border: none;
-		background: var(--color-border, #333);
-	}
-	.nc-slider-simple .nc-slider-thumb {
-		top: 3px; width: 10px; height: 10px;
-		border-radius: 50%;
-	}
-	.nc-slider-simple .nc-slider-thumb::before {
-		content: '';
-		position: absolute;
-		inset: -8px;
-	}
-`;
-document.head.appendChild(sliderStyles);
+// Styles are now in src/styles.scss and compiled during build
 
 /**
  * Creates a slider (single or range type)
@@ -80,7 +15,7 @@ function createSlider(opts) {
 
 	const container = document.createElement('div');
 	container.innerHTML = `
-		${label ? `<label style="display:block;margin:0.5rem 0 0.25rem;font-size:0.75rem;color:var(--color-fg-dim,#888)">${label}</label>` : ''}
+		${label ? `<label>${label}</label>` : ''}
 		<div class="nc-slider${simple ? ' nc-slider-simple' : ''}">
 			<div class="nc-slider-track-mapped"></div>
 			<div class="nc-slider-track"></div>
@@ -104,12 +39,58 @@ function createSlider(opts) {
 	function update() {
 		thumbs.forEach((t, i) => t.style.left = toPercent(values[i]) + '%');
 		if (isRange) {
-			labels[0].textContent = `${values[0]}`;
-			labels[1].textContent = `${values[1]}`;
+			if (!labels[0].contains(document.activeElement)) labels[0].textContent = `${values[0]}`;
+			if (!labels[1].contains(document.activeElement)) labels[1].textContent = `${values[1]}`;
 		} else {
-			labels[0].textContent = `${values[0]}`;
+			if (!labels[0].contains(document.activeElement)) labels[0].textContent = `${values[0]}`;
 		}
 	}
+
+	// Click on label to edit value directly
+	function makeEditable(labelEl, index) {
+		labelEl.style.cursor = 'pointer';
+		labelEl.title = 'Click to edit';
+
+		labelEl.addEventListener('click', (e) => {
+			// Don't trigger if already editing
+			if (labelEl.querySelector('input')) return;
+
+			const currentValue = values[index];
+			const input = document.createElement('input');
+			input.type = 'number';
+			input.min = min;
+			input.max = max;
+			input.value = currentValue;
+			input.style.cssText = 'width: 4em; text-align: center; font-size: inherit; padding: 0 0.25em; background: var(--nc-bg); border: 1px solid var(--nc-border); color: var(--nc-fg);';
+
+			labelEl.textContent = '';
+			labelEl.appendChild(input);
+			input.focus();
+			input.select();
+
+			const finishEdit = () => {
+				let newValue = parseInt(input.value, 10);
+				if (isNaN(newValue)) newValue = currentValue;
+				newValue = Math.max(min, Math.min(max, newValue));
+				values[index] = newValue;
+				labelEl.textContent = `${newValue}`;
+				update();
+				onChange?.(isRange ? [...values] : values[0]);
+			};
+
+			input.addEventListener('blur', finishEdit);
+			input.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					input.blur();
+				} else if (e.key === 'Escape') {
+					labelEl.textContent = `${currentValue}`;
+				}
+			});
+		});
+	}
+
+	labels.forEach((label, i) => makeEditable(label, i));
 
 	function setGradient(hueStops) {
 		if (isRange) {
