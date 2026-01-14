@@ -32,13 +32,23 @@ function createUserSettingsPanel(username, currentStyles)
 	const hashCase = hashStyles.fontVariant;
 
 	// Get current per-user style overrides (null means use global/hash)
-	const savedStyles = customNickColors[username] || {};
+	// Merge MANUAL_OVERRIDES as base, then customNickColors on top
+	const remoteStyles = MANUAL_OVERRIDES[username] || {};
+	const localStyles = customNickColors[username] || {};
+	const savedStyles = { ...(typeof remoteStyles === 'object' ? remoteStyles : {}), ...localStyles };
 	const currentWeight = savedStyles.fontWeight;
 	const currentItalic = savedStyles.fontStyle;
 	const currentCase = savedStyles.fontVariant;
 	const currentInvert = savedStyles.invert; // true, false, or undefined (auto)
 	const currentFontFamily = savedStyles.fontFamily || '';
 	const currentUserNotes = savedStyles.userNotes || '';
+
+	// Determine fontFamily tri-state: null = auto, false = disabled, true = custom
+	// Check if LOCAL settings have fontFamily (not merged result)
+	const hasLocalFontFamily = 'fontFamily' in localStyles;
+	const localFontFamilyValue = localStyles.fontFamily;
+	const remoteFontFamily = (typeof remoteStyles === 'object' ? remoteStyles.fontFamily : null) || '';
+	const initialFontFamilyState = !hasLocalFontFamily ? null : (localFontFamilyValue ? true : false);
 
 	// Check if user has remote overrides
 	const hasRemoteOverride = MANUAL_OVERRIDES[username];
@@ -166,9 +176,12 @@ function createUserSettingsPanel(username, currentStyles)
 				if (invertState !== null) {
 					styles.invert = invertState;
 				}
-				const fontFamily = engine.getFieldValue('fontFamily')?.trim();
-				if (fontFamily) {
-					styles.fontFamily = fontFamily;
+				// Add fontFamily based on tri-state: null = auto (don't save), true = custom, false = disabled
+				const customFontFamilyState = engine.getFieldValue('customFontFamily');
+				if (customFontFamilyState === true) {
+					styles.fontFamily = engine.getFieldValue('fontFamily')?.trim() || '';
+				} else if (customFontFamilyState === false) {
+					styles.fontFamily = ''; // Explicitly disabled
 				}
 				const userNotes = engine.getFieldValue('userNotes')?.trim();
 				if (userNotes) {
@@ -224,7 +237,8 @@ function createUserSettingsPanel(username, currentStyles)
 			{ key: 'fontStyle', type: 'tristate', label: 'Italic', default: currentItalic === 'italic' ? true : currentItalic === 'normal' ? false : null, defaultLabel: hashItalic },
 			{ key: 'fontVariant', type: 'tristate', label: 'Small Caps', default: currentCase === 'small-caps' ? true : currentCase === 'normal' ? false : null, defaultLabel: hashCase },
 			{ key: 'invert', type: 'tristate', label: 'Invert', default: currentInvert === true ? true : currentInvert === false ? false : null, defaultLabel: 'auto' },
-			{ key: 'fontFamily', type: 'text', label: 'Font Family', default: currentFontFamily, placeholder: 'Comic Sans MS, cursive' },
+			{ key: 'customFontFamily', type: 'tristate', label: 'Custom Font', default: initialFontFamilyState, defaultLabel: remoteFontFamily || 'site default' },
+			{ key: 'fontFamily', type: 'text', label: '', default: currentFontFamily, placeholder: 'Comic Sans MS, cursive', showWhen: { field: 'customFontFamily', is: true } },
 		]},
 		{ type: 'section', label: 'Additional CSS', fields: [
 			{ key: 'customCss', type: 'textarea', label: '', default: currentCssString, placeholder: 'background-color: #1a1a2e;\ntext-decoration: underline;', hint: 'CSS properties, one per line' },
@@ -464,9 +478,12 @@ function createUserSettingsPanel(username, currentStyles)
 		if (invertState !== null) {
 			tempStyles.invert = invertState;
 		}
-		const fontFamily = engine.getFieldValue('fontFamily')?.trim();
-		if (fontFamily) {
-			tempStyles.fontFamily = fontFamily;
+		// Handle fontFamily tri-state
+		const customFontFamilyState = engine.getFieldValue('customFontFamily');
+		if (customFontFamilyState === true) {
+			tempStyles.fontFamily = engine.getFieldValue('fontFamily')?.trim() || '';
+		} else if (customFontFamilyState === false) {
+			tempStyles.fontFamily = ''; // Explicitly disabled
 		}
 
 		// Temporarily apply dialog state to customNickColors for applyStyles
@@ -592,9 +609,12 @@ function createUserSettingsPanel(username, currentStyles)
 		if (invertState !== null) {
 			styles.invert = invertState;
 		}
-		const fontFamily = engine.getFieldValue('fontFamily')?.trim();
-		if (fontFamily) {
-			styles.fontFamily = fontFamily;
+		// Handle fontFamily tri-state
+		const customFontFamilyState = engine.getFieldValue('customFontFamily');
+		if (customFontFamilyState === true) {
+			styles.fontFamily = engine.getFieldValue('fontFamily')?.trim() || '';
+		} else if (customFontFamilyState === false) {
+			styles.fontFamily = ''; // Explicitly disabled
 		}
 		const userNotes = engine.getFieldValue('userNotes')?.trim();
 		if (userNotes) {
@@ -653,8 +673,13 @@ function createUserSettingsPanel(username, currentStyles)
 			const state = settings.fontVariant === 'small-caps' ? true : settings.fontVariant === 'normal' ? false : null;
 			engine.setFieldValue('fontVariant', state);
 		}
-		if (settings.fontFamily) {
-			engine.setFieldValue('fontFamily', settings.fontFamily);
+		if (settings.fontFamily !== undefined) {
+			if (settings.fontFamily === '') {
+				engine.setFieldValue('customFontFamily', false);
+			} else {
+				engine.setFieldValue('customFontFamily', true);
+				engine.setFieldValue('fontFamily', settings.fontFamily);
+			}
 		}
 		if (settings.invert !== undefined) {
 			engine.setFieldValue('invert', settings.invert);

@@ -64,34 +64,32 @@ function getNickBase(username, colorFormat = 'hsl', options = {})
 
 	let debugData = [];
 
-	// Check user-saved custom color first
+	// Check remote/manual overrides first (as base)
+	if (MANUAL_OVERRIDES[username]) {
+		const override = MANUAL_OVERRIDES[username];
+		const colorStr = typeof override === 'string' ? override : override.color;
+		if (colorStr) {
+			const parsedColor = parseColor(colorStr, colorFormat);
+			if (parsedColor) styles.color = parsedColor;
+			debugData.push(['Source', 'Override']);
+		}
+
+		if(options.includeStyles && typeof override === 'object')
+			styles = { ...override, ...styles };
+	}
+
+	// Then apply user-saved custom settings on top (takes precedence)
 	if (customNickColors[username]) {
 		const custom = customNickColors[username];
 		const colorStr = typeof custom === 'string' ? custom : custom.color;
 		if (colorStr) {
 			const parsedColor = parseColor(colorStr, colorFormat);
 			if (parsedColor) styles.color = parsedColor;
-
 			debugData.push(['Source', 'Custom']);
 		}
 
 		if(options.includeStyles && typeof custom === 'object')
-			styles = { ...custom, ...styles };
-	}
-
-	// Check remote/manual overrides
-	if (styles.color === null && MANUAL_OVERRIDES[username]) {
-		const override = MANUAL_OVERRIDES[username];
-		const colorStr = typeof override === 'string' ? override : override.color;
-		if (colorStr) {
-			const parsedColor = parseColor(colorStr, colorFormat);
-			if (parsedColor) styles.color = parsedColor;
-
-			debugData.push(['Source', 'Override']);
-		}
-
-		if(options.includeStyles && typeof override === 'object')
-			styles = { ...override, ...styles };
+			styles = { ...styles, ...custom };
 	}
 
 	if (options.effectiveConfig.useSingleColor) 
@@ -203,23 +201,24 @@ function getHashBasedStyleVariations(username) {
  * Get raw styles for editing in color picker
  * Returns the base color values that user can edit
  */
-function getRawStylesForPicker(username) 
+function getRawStylesForPicker(username)
 {
 	const base = getNickBase(username);
 
 	// Build styles object with base color
 	let styles = { color: `hsl(${base.h}, ${base.s}%, ${base.l}%)` };
 
-	// Copy non-color properties from custom save
+	// Merge MANUAL_OVERRIDES first (as base), then customNickColors on top
+	if (MANUAL_OVERRIDES[username] && typeof MANUAL_OVERRIDES[username] === 'object') {
+		const override = { ...MANUAL_OVERRIDES[username] };
+		delete override.color;
+		styles = { ...styles, ...override };
+	}
 	if (customNickColors[username] && typeof customNickColors[username] === 'object') {
 		const custom = { ...customNickColors[username] };
 		delete custom.color;
 		delete custom.invert;
 		styles = { ...styles, ...custom };
-	} else if (MANUAL_OVERRIDES[username] && typeof MANUAL_OVERRIDES[username] === 'object') {
-		const override = { ...MANUAL_OVERRIDES[username] };
-		delete override.color;
-		styles = { ...styles, ...override };
 	}
 
 	return styles;

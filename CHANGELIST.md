@@ -4,8 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [1.2.2] - 2026-01-13
 
+### Added
+- **Font family tristate toggle** - Custom font now has auto/off/on states like other style variations (auto inherits from remote overrides)
+
 ### Fixed
 - Bug with not removing userNotes from styles
+- MANUAL_OVERRIDES now properly merge with local customNickColors (remote as base, local on top)
 
 ## [1.2.1] - 2026-01-13
 
