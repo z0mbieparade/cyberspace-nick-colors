@@ -181,7 +181,16 @@ function createDialog(opts) {
 	}
 
 	// Close on overlay click or Escape
-	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+	// Smart click detection: only close if BOTH mousedown and mouseup happen on the overlay
+	// This prevents accidental closes when dragging sliders outside the dialog
+	let mouseDownOnOverlay = false;
+	overlay.addEventListener('mousedown', (e) => {
+		mouseDownOnOverlay = e.target === overlay;
+	});
+	overlay.addEventListener('click', (e) => {
+		if (e.target === overlay && mouseDownOnOverlay) close();
+		mouseDownOnOverlay = false;
+	});
 	overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 	overlay.setAttribute('tabindex', '-1');
 
