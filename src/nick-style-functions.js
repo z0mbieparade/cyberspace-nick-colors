@@ -21,6 +21,7 @@ function makeStylesObject(styles)
 	delete styles.appendIcon;
 	delete styles.prependIcon;
 	delete styles.invert;
+	delete styles.userNotes;
 
 	for(const key in styles)
 	{
