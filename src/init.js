@@ -108,20 +108,46 @@ if (registerMenuCommand) {
 	});
 }
 
-// Fetch remote overrides if configured
+// Check for updates - can be called anytime
+function checkForUpdates() {
+	if (!gmXmlHttpRequest) return Promise.resolve();
+
+	const fallbackURL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js';
+	const updateURL = (typeof GM_info !== 'undefined' && GM_info.script)
+		? (GM_info.script.updateURL || GM_info.script.downloadURL || fallbackURL)
+		: fallbackURL;
+
+	return new Promise((resolve) => {
+		gmXmlHttpRequest({
+			method: 'GET',
+			url: updateURL,
+			onload: (response) => {
+				try {
+					const match = response.responseText.match(/@version\s+(\S+)/);
+					if (match) {
+						const remoteVersion = match[1];
+						UPDATE_AVAILABLE = (remoteVersion !== VERSION) ? remoteVersion : false;
+					}
+				} catch (e) { /* ignore */ }
+				resolve();
+			},
+			onerror: () => resolve()
+		});
+	});
+}
+
+// Fetch remote overrides
 function fetchOverrides() {
 	if (!OVERRIDES_URL) return Promise.resolve();
 
 	return new Promise((resolve) => {
-		// Use GM_xmlhttpRequest if available (bypasses CORS)
-		if (typeof GM_xmlhttpRequest !== 'undefined') {
-			GM_xmlhttpRequest({
+		if (gmXmlHttpRequest) {
+			gmXmlHttpRequest({
 				method: 'GET',
 				url: OVERRIDES_URL,
 				onload: (response) => {
 					try {
 						const remoteOverrides = JSON.parse(response.responseText);
-						// Merge remote overrides (local MANUAL_OVERRIDES takes precedence)
 						MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
 						console.log('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
 					} catch (e) {
@@ -151,9 +177,10 @@ function fetchOverrides() {
 // Initialize our safe CSS variables (handles transparent values)
 initCssVariables();
 
-// Initial colorization (after fetching overrides)
+// Initial colorization (after fetching overrides) and update check
 fetchOverrides().then(() => {
 	colorizeAll();
+	checkForUpdates();
 });
 
 // Watch for new content

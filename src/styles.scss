@@ -314,9 +314,27 @@
 			color: var(--nc-fg-dim);
 			text-decoration: none;
 
-			&.github-link 
+			&.github-link
 			{
 				height: calc(var(--font-size-base) * 0.875);
+			}
+		}
+
+		.nc-version-link {
+			cursor: pointer;
+			transition: color 0.15s;
+
+			&:hover {
+				color: var(--nc-fg);
+			}
+
+			&.nc-update-available {
+				color: var(--nc-warn);
+				font-weight: bold;
+
+				&:hover {
+					color: var(--nc-fg);
+				}
 			}
 		}
 	}

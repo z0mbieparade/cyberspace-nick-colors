@@ -32,6 +32,8 @@ const metadata = `// ==UserScript==
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
+// @connect      github.com
 // @connect      raw.githubusercontent.com
 // @connect      gist.githubusercontent.com
 // @run-at       document-idle
