@@ -38,6 +38,7 @@ function createUserSettingsPanel(username, currentStyles)
 	const currentCase = savedStyles.fontVariant;
 	const currentInvert = savedStyles.invert; // true, false, or undefined (auto)
 	const currentFontFamily = savedStyles.fontFamily || '';
+	const currentUserNotes = savedStyles.userNotes || '';
 
 	// Check if user has remote overrides
 	const hasRemoteOverride = MANUAL_OVERRIDES[username];
@@ -169,6 +170,10 @@ function createUserSettingsPanel(username, currentStyles)
 				if (fontFamily) {
 					styles.fontFamily = fontFamily;
 				}
+				const userNotes = engine.getFieldValue('userNotes')?.trim();
+				if (userNotes) {
+					styles.userNotes = userNotes;
+				}
 				customNickColors[username] = styles;
 				saveCustomNickColors();
 				refreshAllColors();
@@ -194,6 +199,10 @@ function createUserSettingsPanel(username, currentStyles)
 	// Build the schema for engine-managed fields
 	const userSettingsSchema = [
 		{ type: 'hr' },
+		{ type: 'section', label: 'Notes', hint: 'Personal notes about this user (visible on hover)', fields: [
+			{ key: 'userNotes', type: 'textarea', label: '', default: currentUserNotes,
+				placeholder: 'Add personal notes about this user...' },
+		]},
 		{ type: 'section', label: 'Custom Icons', hint: 'Prepend/Append a custom character or emoji to the nickname.', fields: [
 			{ key: 'prependIconEnabled', type: 'tristate', label: 'Prepend icon', default: initialPrependIconState, defaultLabel: hashIcon },
 			{ key: 'prependIconPicker', type: 'custom', showWhen: { field: 'prependIconEnabled', is: true }, render: () => {
@@ -587,6 +596,10 @@ function createUserSettingsPanel(username, currentStyles)
 		if (fontFamily) {
 			styles.fontFamily = fontFamily;
 		}
+		const userNotes = engine.getFieldValue('userNotes')?.trim();
+		if (userNotes) {
+			styles.userNotes = userNotes;
+		}
 		return styles;
 	}
 
@@ -645,6 +658,9 @@ function createUserSettingsPanel(username, currentStyles)
 		}
 		if (settings.invert !== undefined) {
 			engine.setFieldValue('invert', settings.invert);
+		}
+		if (settings.userNotes) {
+			engine.setFieldValue('userNotes', settings.userNotes);
 		}
 		updatePreview();
 	}
