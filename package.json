@@ -1,6 +1,6 @@
 {
   "name": "cyberspace-color-nicks",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A userscript that adds consistent, hash-based colors to usernames on [Cyberspace](https://cyberspace.online). Created because I can't handle users all being the same color in a chatroom, it gives me a headache.",
   "main": "build.js",
   "scripts": {
