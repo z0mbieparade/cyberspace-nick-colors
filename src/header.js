@@ -83,6 +83,7 @@ const CONTAINER_HINTS_EXCLUDE = [
 	'.sidebar',
 	'footer',
 	'.nc-dialog-attribution',
+	'.editor-wrapper',
 	'code', 'pre', 'script'
 ];
 
