@@ -13,6 +13,81 @@ document.addEventListener('contextmenu', (e) => {
 	}
 });
 
+// Mobile long-press support (500ms hold with visual feedback)
+let longPressTimer = null;
+let longPressTarget = null;
+let longPressStartPos = null;
+const LONG_PRESS_DURATION = 500;
+const LONG_PRESS_MOVE_THRESHOLD = 10;
+
+document.addEventListener('touchstart', (e) => {
+	const target = e.target.closest('[data-nick-colored], [data-mention-colored]');
+	if (!target || !target.dataset.username) return;
+
+	const touch = e.touches[0];
+	longPressStartPos = { x: touch.clientX, y: touch.clientY };
+	longPressTarget = target;
+
+	// Visual feedback - subtle dim
+	target.style.transition = 'opacity 0.15s, transform 0.15s';
+	target.style.opacity = '0.7';
+	target.style.transform = 'scale(0.97)';
+
+	longPressTimer = setTimeout(() => {
+		if (longPressTarget) {
+			// Reset visual feedback
+			longPressTarget.style.opacity = '';
+			longPressTarget.style.transform = '';
+			// Open the settings panel
+			createUserSettingsPanel(longPressTarget.dataset.username, getRawStylesForPicker(longPressTarget.dataset.username));
+			longPressTarget = null;
+		}
+	}, LONG_PRESS_DURATION);
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+	if (!longPressTimer || !longPressStartPos) return;
+
+	const touch = e.touches[0];
+	const dx = Math.abs(touch.clientX - longPressStartPos.x);
+	const dy = Math.abs(touch.clientY - longPressStartPos.y);
+
+	// Cancel if moved too far (user is scrolling)
+	if (dx > LONG_PRESS_MOVE_THRESHOLD || dy > LONG_PRESS_MOVE_THRESHOLD) {
+		clearTimeout(longPressTimer);
+		longPressTimer = null;
+		if (longPressTarget) {
+			longPressTarget.style.opacity = '';
+			longPressTarget.style.transform = '';
+			longPressTarget = null;
+		}
+	}
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+	if (longPressTimer) {
+		clearTimeout(longPressTimer);
+		longPressTimer = null;
+	}
+	if (longPressTarget) {
+		longPressTarget.style.opacity = '';
+		longPressTarget.style.transform = '';
+		longPressTarget = null;
+	}
+});
+
+document.addEventListener('touchcancel', () => {
+	if (longPressTimer) {
+		clearTimeout(longPressTimer);
+		longPressTimer = null;
+	}
+	if (longPressTarget) {
+		longPressTarget.style.opacity = '';
+		longPressTarget.style.transform = '';
+		longPressTarget = null;
+	}
+});
+
 // Greasemonkey/Tampermonkey menu commands
 // Support both GM_registerMenuCommand (Tampermonkey) and GM.registerMenuCommand (Greasemonkey 4.x)
 const registerMenuCommand = (typeof GM_registerMenuCommand === 'function')
@@ -120,4 +195,4 @@ themeObserver.observe(document.documentElement, {
 	attributeFilter: ['data-theme']
 });
 
-console.log('[Nick Colors] Loaded. Right-click any colored username to customize.');
+console.log('[Nick Colors] Loaded. Right-click or long-press any colored username to customize.');

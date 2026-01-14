@@ -703,6 +703,33 @@
 	cursor: help;
 }
 
+// Notes tooltip for user notes
+.nc-notes-tooltip {
+	position: fixed;
+	z-index: 9999999;
+	background: var(--nc-bg, #0a0a0a);
+	border: 1px solid var(--nc-border, #333);
+	color: var(--nc-fg, #e0e0e0);
+	padding: 0.5rem 0.75rem;
+	font-size: var(--font-size-base, 12px);
+	font-family: inherit;
+	max-width: 300px;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+
+	&.visible {
+		opacity: 1;
+	}
+}
+
+.nc-has-notes {
+	cursor: help;
+}
+
 /* Add a bit of extra theme styling */
 
 html[data-theme="poetry"],

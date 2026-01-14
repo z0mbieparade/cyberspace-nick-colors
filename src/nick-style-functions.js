@@ -473,7 +473,7 @@ function applyStyles(element, username, options = {})
 		if (appendIcon) newText = newText + ' ' + appendIcon;
 		element.textContent = newText;
 	} 
-	else if (element.dataset.iconApplied) 
+	else if (element.dataset.iconApplied)
 	{
 		// Icons were removed - restore original text
 		if (element.dataset.originalText) {
@@ -482,7 +482,23 @@ function applyStyles(element, username, options = {})
 		delete element.dataset.iconApplied;
 		delete element.dataset.originalText;
 	}
-	
+
+	// Handle user notes tooltip
+	const userNotes = customNickColors[username]?.userNotes;
+	if (userNotes) {
+		element.dataset.userNotes = userNotes;
+		element.classList.add('nc-has-notes');
+		// Only attach listeners once
+		if (!element.dataset.notesListenerAttached) {
+			element.addEventListener('mouseenter', showNotesTooltip);
+			element.addEventListener('mouseleave', hideNotesTooltip);
+			element.dataset.notesListenerAttached = 'true';
+		}
+	} else {
+		delete element.dataset.userNotes;
+		element.classList.remove('nc-has-notes');
+	}
+
 	if(options.debugData)
 	{
 		// Store debug data for tooltip
@@ -530,5 +546,47 @@ function showDebugTooltip(e) {
 function hideDebugTooltip() {
 	if (debugTooltip) {
 		debugTooltip.classList.remove('visible');
+	}
+}
+
+// Notes tooltip functions (with 300ms delay)
+let notesTooltip = null;
+let notesTooltipTimer = null;
+
+function showNotesTooltip(e) {
+	const element = e.currentTarget;
+	const notes = element.dataset.userNotes;
+
+	if (!notes) return;
+
+	// Clear any existing timer
+	if (notesTooltipTimer) {
+		clearTimeout(notesTooltipTimer);
+	}
+
+	notesTooltipTimer = setTimeout(() => {
+		if (!notesTooltip) {
+			notesTooltip = document.createElement('div');
+			notesTooltip.className = 'nc-notes-tooltip';
+			document.body.appendChild(notesTooltip);
+		}
+
+		notesTooltip.textContent = notes;
+
+		// Position tooltip below element
+		const rect = element.getBoundingClientRect();
+		notesTooltip.style.left = rect.left + 'px';
+		notesTooltip.style.top = (rect.bottom + 4) + 'px';
+		notesTooltip.classList.add('visible');
+	}, 300);
+}
+
+function hideNotesTooltip() {
+	if (notesTooltipTimer) {
+		clearTimeout(notesTooltipTimer);
+		notesTooltipTimer = null;
+	}
+	if (notesTooltip) {
+		notesTooltip.classList.remove('visible');
 	}
 }
