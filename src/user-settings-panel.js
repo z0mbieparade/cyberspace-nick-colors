@@ -8,7 +8,7 @@ function createUserSettingsPanel(username, currentStyles)
 	const eff = getEffectiveSiteConfig();
 	
 	// Filter out color, icon, and style variation properties from CSS string
-	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'fontFamily', 'invert'];
+	const styleVariationKeys = ['color', 'icon', 'fontWeight', 'fontStyle', 'fontVariant', 'fontFamily', 'invert', 'userNotes'];
 	const filteredStyles = Object.fromEntries(
 		Object.entries(makeStylesObject(currentStyles)).filter(([key]) => !styleVariationKeys.includes(key))
 	);
