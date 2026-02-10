@@ -1,12 +1,12 @@
 # Cyberspace Nick Colors
 
-A userscript that adds consistent, hash-based colors to usernames on [Cyberspace](https://cyberspace.online). Created because I can't handle users all being the same color in a chatroom, it gives me a headache.
+A userscript that adds consistent, hash-based colors to usernames on [Cyberspace](https://cyberspace.online) and [Cyberspace Beta](https://beta.cyberspace.online). Created because I can't handle users all being the same color in a chatroom, it gives me a headache.
 
 ## Installation
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/)
 2. Click here and Greasemonkey or Tampermonkey should give you the option to install the script: [Install](https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js)
-3. Return to cyberspace.online and refresh.
+3. Return to Cyberspace and refresh.
 
 ## Usage
 

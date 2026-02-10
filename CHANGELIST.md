@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-02-10
+
+### Added
+- **Beta site support** - Script now works on beta.cyberspace.online in addition to the main site
+- Added selector for beta site's username spans (`span.cursor-pointer.hover:underline`)
+- Site-specific container hints (beta uses `#main-content-area` and `.space-y-1`)
+- Path-based hints - more permissive coloring on `/chat/` pages
+
+### Fixed
+- Username detection now works for elements without href attributes (beta site compatibility)
+- User list usernames on beta site now get colored
+- GM storage now supports both old (`GM_*`) and new (`GM.*`) APIs - settings/notes sync across both domains
+
 ## [1.2.4] - 2026-01-14
 
 ### Added
