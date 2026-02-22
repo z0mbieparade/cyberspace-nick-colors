@@ -25,12 +25,15 @@ const metadata = `// ==UserScript==
 // @version      ${version}
 // @description  Consistent bright colors for usernames across the site
 // @match        https://cyberspace.online/*
+// @match        https://beta.cyberspace.online/*
 // @updateURL    https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js
 // @downloadURL  https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js
 // @grant        GM_registerMenuCommand
 // @grant        GM.registerMenuCommand
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM.setValue
+// @grant        GM.getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM.xmlHttpRequest
 // @connect      github.com

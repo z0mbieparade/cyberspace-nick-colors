@@ -73,9 +73,13 @@ function isLikelyUsername(element) {
 	if (slashCount > 1) {
 		return false;
 	}
-	
+
 	// If container hints are specified, ONLY color within those containers
-	if (CONTAINER_HINTS.length > 0) {
+	// Exception: elements without href (e.g., beta site spans) use a specific enough selector
+	// Also skip if current path matches a path hint (more permissive on chat pages)
+	const hasHref = !!element.getAttribute('href');
+	const onPermissivePath = PATH_HINTS.some(p => window.location.pathname.startsWith(p));
+	if (CONTAINER_HINTS.length > 0 && hasHref && !onPermissivePath) {
 		const inContainer = CONTAINER_HINTS.some(sel => element.closest(sel));
 		if (!inContainer) {
 			return false;
@@ -90,9 +94,14 @@ function isLikelyUsername(element) {
 		}
 	}
 
-	//strip slash from start for checking
-	const hrefPath = href.startsWith('/') ? href.slice(1) : href;
-	return isValidUsername(hrefPath);
+	// For elements with href, validate the path
+	if (href) {
+		const hrefPath = href.startsWith('/') ? href.slice(1) : href;
+		return isValidUsername(hrefPath);
+	}
+
+	// For elements without href (e.g., beta site spans), validate text content
+	return isValidUsername(text);
 }
 
 function colorizeAll() {

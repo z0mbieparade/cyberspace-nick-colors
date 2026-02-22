@@ -2,16 +2,87 @@
 // GM API FALLBACKS (for testing outside userscript manager)
 // =====================================================
 
-const GM_setValue = (typeof window.GM_setValue === 'function')
-	? window.GM_setValue
-	: (key, value) => localStorage.setItem('nickColors_' + key, value);
+// Detect which GM API is available:
+// 1. Old style: GM_setValue/GM_getValue (synchronous)
+// 2. New style: GM.setValue/GM.getValue (async/Promise-based)
+// 3. Fallback: localStorage
+const _hasOldGM = typeof GM_setValue === 'function';
+const _hasNewGM = typeof GM !== 'undefined' && typeof GM.setValue === 'function';
 
-const GM_getValue = (typeof window.GM_getValue === 'function')
-	? window.GM_getValue
-	: (key, defaultValue) => {
+// Wrapper functions that handle both sync and async APIs uniformly
+// For setValue: fire-and-forget (don't need to wait), also update cache
+const _GM_setValue = _hasOldGM ? GM_setValue :
+	_hasNewGM ? (key, value) => { _gmCache[key] = value; GM.setValue(key, value); } :
+	(key, value) => localStorage.setItem('nickColors_' + key, value);
+
+// For getValue: need async handling for new API
+// We'll use a sync wrapper that returns cached values, with async refresh
+let _gmCache = {};
+const _GM_getValue = _hasOldGM ? GM_getValue :
+	_hasNewGM ? (key, defaultValue) => {
+		// Return cached value if available, otherwise default
+		// Cache is populated by _initGMCache()
+		return (key in _gmCache) ? _gmCache[key] : defaultValue;
+	} :
+	(key, defaultValue) => {
 		const val = localStorage.getItem('nickColors_' + key);
 		return val !== null ? val : defaultValue;
 	};
+
+// Async initialization for new GM API - loads all values into cache
+async function _initGMCache() {
+	if (!_hasNewGM) return;
+	try {
+		const keys = ['debugMode', 'siteConfig', 'customNickColors'];
+		for (const key of keys) {
+			const val = await GM.getValue(key);
+			if (val !== undefined) _gmCache[key] = val;
+		}
+	} catch (e) {
+		console.error('[Nick Colors] Failed to load GM cache:', e);
+	}
+}
+
+// Migrate data from localStorage to GM storage (one-time migration)
+async function _migrateFromLocalStorage() {
+	const keys = ['debugMode', 'siteConfig', 'customNickColors'];
+
+	for (const key of keys) {
+		const lsKey = 'nickColors_' + key;
+		const lsVal = localStorage.getItem(lsKey);
+
+		if (lsVal !== null) {
+			// Check if GM storage already has this key
+			const gmVal = _hasNewGM ? await GM.getValue(key) : _GM_getValue(key, null);
+
+			if (gmVal === undefined || gmVal === null) {
+				// Migrate from localStorage to GM
+				if (_hasNewGM) {
+					await GM.setValue(key, lsVal);
+					_gmCache[key] = lsVal;
+				} else if (_hasOldGM) {
+					GM_setValue(key, lsVal);
+				}
+			}
+		}
+	}
+}
+
+// Initialize cache and run migration if using new GM API
+if (_hasNewGM) {
+	_initGMCache().then(async () => {
+		// Try to migrate from localStorage
+		await _migrateFromLocalStorage();
+
+		// Reload config after cache is populated (and possibly migrated)
+		if (typeof loadSiteConfig === 'function') loadSiteConfig();
+		if (typeof loadCustomNickColors === 'function') loadCustomNickColors();
+		if (typeof colorizeAll === 'function') colorizeAll();
+	});
+} else if (_hasOldGM) {
+	// Also migrate for old GM API
+	_migrateFromLocalStorage();
+}
 
 // Helper to convert hex to RGB (0-255)
 function hexToRgb(hex) {

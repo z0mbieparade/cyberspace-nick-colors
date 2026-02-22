@@ -8,16 +8,19 @@
 // =====================================================
 
 // Debug mode - shows detailed calculation info in dialogs
-let DEBUG = GM_getValue('debugMode', 'false') === 'true';
+let DEBUG = _GM_getValue('debugMode', 'false') === 'true';
 const DEBUG_LOG = [];
 
 function saveDebugMode() {
-	GM_setValue('debugMode', DEBUG ? 'true' : 'false');
+	_GM_setValue('debugMode', DEBUG ? 'true' : 'false');
 }
 
 // URL to fetch manual overrides from (set to null to disable)
 // Host your overrides.json on GitHub, Gist, or any CORS-friendly location
 const OVERRIDES_URL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/overrides.json';
+
+// Detect if we're on the beta site (different HTML structure)
+const IS_BETA_SITE = window.location.hostname === 'beta.cyberspace.online';
 
 // Update check - stores remote version if newer, null if not checked, false if up to date
 let UPDATE_AVAILABLE = null; // null = not checked, false = up to date, string = new version
@@ -73,7 +76,8 @@ const DEFAULT_SITE_CONFIG = {
 // CSS selectors for finding username links
 // Add more selectors as needed for different parts of the site
 const USERNAME_SELECTORS = [
-	'a[href^="/"]',      // links starting with / (common for user profiles)
+	'a[href^="/"]',                      // links starting with / (common for user profiles)
+	'span.cursor-pointer.hover\\:underline',  // beta site username spans
 	// Add more patterns as you find them:
 	// '.username',
 	// '.author-link',
@@ -83,9 +87,17 @@ const USERNAME_SELECTORS = [
 // Containers to search within for USERNAME LINKS ONLY (not @mentions)
 // This helps avoid coloring non-username links that don't have @ prefix
 // @mentions are searched across the whole page since they're explicit
-const CONTAINER_HINTS = [
-	'.chat-main-content',           // chat messages
-	'.profile-box-inverted',        // profile header
+const CONTAINER_HINTS = IS_BETA_SITE ? [
+	'#main-content-area',           // beta: chat messages
+	'.space-y-1',                   // beta: user list
+] : [
+	'.chat-main-content',           // main: chat messages
+	'.profile-box-inverted',        // main: profile header
+];
+
+// Path patterns where we allow more permissive coloring (skip container hints)
+const PATH_HINTS = [
+	'/chat/',                       // chat rooms
 ];
 
 // Containers to EXCLUDE from coloring (applies to both links and @mentions)
@@ -200,7 +212,7 @@ if (!siteTheme) loadSiteTheme();
 let siteConfig = { ...DEFAULT_SITE_CONFIG };
 function loadSiteConfig() {
 	try {
-		const savedSiteConfig = GM_getValue('siteConfig', null);
+		const savedSiteConfig = _GM_getValue('siteConfig', null);
 		if (savedSiteConfig) {
 			siteConfig = { ...DEFAULT_SITE_CONFIG, ...JSON.parse(savedSiteConfig) };
 		}
@@ -211,7 +223,7 @@ function loadSiteConfig() {
 loadSiteConfig();
 
 function saveSiteConfig() {
-	GM_setValue('siteConfig', JSON.stringify(siteConfig));
+	_GM_setValue('siteConfig', JSON.stringify(siteConfig));
 }
 
 // =====================================================
@@ -222,7 +234,7 @@ function saveSiteConfig() {
 let customNickColors = {};
 function loadCustomNickColors() {
 	try {
-		const saved = GM_getValue('customNickColors', '{}');
+		const saved = _GM_getValue('customNickColors', '{}');
 		customNickColors = JSON.parse(saved);
 	} catch (e) {
 		customNickColors = {};
@@ -231,5 +243,5 @@ function loadCustomNickColors() {
 loadCustomNickColors();
 
 function saveCustomNickColors() {
-	GM_setValue('customNickColors', JSON.stringify(customNickColors));
+	_GM_setValue('customNickColors', JSON.stringify(customNickColors));
 }
