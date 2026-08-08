@@ -295,6 +295,29 @@ describe('Contrast and Inversion', () => {
 			expect(el.style.color).toBeTruthy();
 			// With threshold 0, no contrast adjustment happens
 		});
+
+		it('records the final contrast ratio on the element', () => {
+			const el = document.createElement('span');
+			el.textContent = 'ratiotest';
+			applyStyles(el, 'ratiotest');
+
+			const ratio = parseFloat(el.dataset.contrastRatio);
+			expect(Number.isNaN(ratio)).toBe(false);
+			expect(ratio).toBeGreaterThanOrEqual(1);
+			expect(ratio).toBeLessThanOrEqual(21);
+		});
+
+		it('records a contrast ratio meeting the threshold after adjustment', () => {
+			siteConfig.contrastThreshold = 4.5;
+			// A near-black nick that forces both inversion and lightness adjustment
+			customNickColors['adjustedratio'] = { color: 'hsl(0, 0%, 5%)' };
+
+			const el = document.createElement('span');
+			el.textContent = 'adjustedratio';
+			applyStyles(el, 'adjustedratio');
+
+			expect(parseFloat(el.dataset.contrastRatio)).toBeGreaterThanOrEqual(4.5);
+		});
 	});
 
 	describe('Inverted containers behavior', () => {

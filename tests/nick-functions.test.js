@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import './setup.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { dom } from './setup.js';
+
+const SITE_ORIGIN = 'https://cyberspace.online';
+const goToPath = (path) => dom.reconfigure({ url: SITE_ORIGIN + path });
 
 describe('isValidUsername', () => {
 	it('accepts valid usernames', () => {
@@ -230,6 +233,94 @@ describe('DOM manipulation', () => {
 
 			const nick = document.querySelector('a');
 			expect(nick.dataset.nickColored).toBeUndefined();
+		});
+	});
+
+	describe('isPathMatch', () => {
+		afterEach(() => goToPath('/'));
+
+		it('matches an exact path', () => {
+			goToPath('/terminal');
+			expect(isPathMatch(['/terminal'])).toBe(true);
+		});
+
+		it('matches a sub-path', () => {
+			goToPath('/terminal/session/1');
+			expect(isPathMatch(['/terminal'])).toBe(true);
+		});
+
+		it('ignores trailing slashes on both sides', () => {
+			goToPath('/terminal/');
+			expect(isPathMatch(['/terminal'])).toBe(true);
+			expect(isPathMatch(['/terminal/'])).toBe(true);
+		});
+
+		it('does not match a partial segment', () => {
+			goToPath('/terminals');
+			expect(isPathMatch(['/terminal'])).toBe(false);
+		});
+
+		it('does not match an unrelated path', () => {
+			goToPath('/chat/general');
+			expect(isPathMatch(['/terminal'])).toBe(false);
+		});
+
+		it('does not match the site root', () => {
+			goToPath('/');
+			expect(isPathMatch(['/terminal'])).toBe(false);
+		});
+
+		it('returns false for an empty or missing list', () => {
+			goToPath('/terminal');
+			expect(isPathMatch([])).toBe(false);
+			expect(isPathMatch(null)).toBe(false);
+		});
+	});
+
+	describe('excluded pages', () => {
+		afterEach(() => goToPath('/'));
+
+		it('/terminal is in the exclude list', () => {
+			expect(PATH_EXCLUDE).toContain('/terminal');
+		});
+
+		it('does not colorize nicks on an excluded page', () => {
+			goToPath('/terminal');
+			document.body.innerHTML = `
+				<div class="chat-main-content">
+					<a href="/user1">user1</a>
+				</div>
+			`;
+
+			colorizeAll();
+
+			const nick = document.querySelector('a');
+			expect(nick.dataset.nickColored).toBeUndefined();
+			expect(nick.style.color).toBe('');
+		});
+
+		it('does not colorize @mentions on an excluded page', () => {
+			goToPath('/terminal');
+			document.body.innerHTML = '<div class="chat-main-content">hey @user1</div>';
+
+			colorizeAll();
+
+			expect(document.querySelector('[data-mention-colored]')).toBeNull();
+		});
+
+		it('colorizes again after navigating off an excluded page', () => {
+			goToPath('/terminal');
+			document.body.innerHTML = `
+				<div class="chat-main-content">
+					<a href="/user1">user1</a>
+				</div>
+			`;
+			colorizeAll();
+			expect(document.querySelector('a').dataset.nickColored).toBeUndefined();
+
+			goToPath('/chat/general');
+			colorizeAll();
+			expect(document.querySelector('a').dataset.nickColored).toBe('true');
 		});
 	});
 

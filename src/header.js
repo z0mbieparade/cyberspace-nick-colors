@@ -97,7 +97,13 @@ const CONTAINER_HINTS = IS_BETA_SITE ? [
 
 // Path patterns where we allow more permissive coloring (skip container hints)
 const PATH_HINTS = [
-	'/chat/',                       // chat rooms
+	'/chat',                        // chat rooms
+];
+
+
+// Ignore these pages
+const PATH_EXCLUDE = [
+	'/terminal',                    // canvas-rendered terminal emulator
 ];
 
 // Containers to EXCLUDE from coloring (applies to both links and @mentions)

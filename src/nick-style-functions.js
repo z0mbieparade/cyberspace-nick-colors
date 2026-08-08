@@ -390,6 +390,7 @@ function generateStyles(username, options = {})
 	return {
 		styles,
 		nickConfig: { ...nickStyles, prependIcon, appendIcon },
+		contrastRatio,
 		debugData
 	};
 }
@@ -453,7 +454,7 @@ function applyStyles(element, username, options = {})
 
 	element.dataset[`${options.matchType}Colored`] = 'true';
 	element.dataset.username = username;
-	element.dataset.contrastRatio = contrastRatio;
+	if (typeof contrastRatio === 'number') element.dataset.contrastRatio = contrastRatio.toFixed(2);
 
 	const prependIcon = nickConfig.prependIcon;
 	const appendIcon = nickConfig.appendIcon;

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-08-08
+
+### Added
+- **Page exclusion list** - `PATH_EXCLUDE` skips coloring entirely on pages that render their own content; `/terminal` (the canvas terminal emulator) is the first entry
+- Path matching now compares whole segments, so `/terminal` matches `/terminal` and `/terminal/x` but not `/terminals`
+
+### Changed
+- Permissive-path hint for chat now also covers the bare `/chat` index page, not just `/chat/<room>`
+- LOGIC.md updated to match the code - theme detection reads `<html data-theme>` and resolves colors per-key through CSS variable → `custom_theme` → preset → default; corrected the preset theme table (4 hue ranges were wrong); documented the contrast lightness adjustment and how inverted containers actually work
+
+### Fixed
+- `data-contrast-ratio` on colored nicks was always the string `"undefined"` - it now holds the final ratio after inversion and contrast adjustment
+
 ## [1.3.0] - 2026-02-10
 
 ### Added

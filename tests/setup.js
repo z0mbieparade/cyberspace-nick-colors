@@ -85,6 +85,7 @@ const script = new Function(code + `
 		hslToRgb,
 		getRelativeLuminance,
 		getContrastRatio,
+		isPathMatch,
 		toKebabCase,
 		toCamelCase,
 		stylesToCssString,
@@ -134,6 +135,8 @@ const script = new Function(code + `
 		customNickColors,
 		DEFAULT_SITE_CONFIG,
 		MANUAL_OVERRIDES,
+		PATH_HINTS,
+		PATH_EXCLUDE,
 	});
 `);
 

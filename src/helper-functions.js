@@ -523,6 +523,19 @@ function getThemeDefaultSettings(themeName)
 	};
 }
 
+// Check whether the current page path matches one of the given path patterns.
+// Matches whole segments, so '/terminal' matches '/terminal' and '/terminal/x',
+// but not '/terminals'. Trailing slashes are ignored on both sides.
+function isPathMatch(paths) {
+	if (!paths || paths.length === 0) return false;
+	const currentPath = window.location.pathname.replace(/\/+$/, '');
+	return paths.some(path => {
+		const pattern = path.replace(/\/+$/, '');
+		if (!pattern) return false;
+		return currentPath === pattern || currentPath.startsWith(pattern + '/');
+	});
+}
+
 // Convert camelCase to kebab-case
 function toKebabCase(str) {
 	return str.replace(/([A-Z])/g, '-$1').toLowerCase();

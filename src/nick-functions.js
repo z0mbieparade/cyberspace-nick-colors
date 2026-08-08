@@ -78,7 +78,7 @@ function isLikelyUsername(element) {
 	// Exception: elements without href (e.g., beta site spans) use a specific enough selector
 	// Also skip if current path matches a path hint (more permissive on chat pages)
 	const hasHref = !!element.getAttribute('href');
-	const onPermissivePath = PATH_HINTS.some(p => window.location.pathname.startsWith(p));
+	const onPermissivePath = isPathMatch(PATH_HINTS);
 	if (CONTAINER_HINTS.length > 0 && hasHref && !onPermissivePath) {
 		const inContainer = CONTAINER_HINTS.some(sel => element.closest(sel));
 		if (!inContainer) {
@@ -105,6 +105,8 @@ function isLikelyUsername(element) {
 }
 
 function colorizeAll() {
+	if (isPathMatch(PATH_EXCLUDE)) return;
+
 	const selector = USERNAME_SELECTORS.join(', ');
 
 	document.querySelectorAll(selector).forEach(el => {
