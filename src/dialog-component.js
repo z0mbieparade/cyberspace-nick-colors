@@ -185,11 +185,7 @@ function createDialog(opts) {
 	if (versionLink) {
 		versionLink.style.cursor = 'pointer';
 		versionLink.addEventListener('click', () => {
-			const fallbackURL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js';
-			const downloadURL = (typeof GM_info !== 'undefined' && GM_info.script)
-				? (GM_info.script.downloadURL || GM_info.script.updateURL || fallbackURL)
-				: fallbackURL;
-			window.open(downloadURL, '_blank');
+			window.open(getScriptURL(), '_blank');
 		});
 
 		// Re-check for updates if not yet checked, then update the UI

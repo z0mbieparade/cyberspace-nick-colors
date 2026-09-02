@@ -748,6 +748,85 @@
 	cursor: help;
 }
 
+// =====================================================
+// UPDATE BANNER
+// =====================================================
+
+.nc-update-banner {
+	position: fixed;
+	width: fit-content;
+	top: 0;
+	// Centred by pinning both edges and letting auto margins split the slack, rather
+	// than a translateX - the transform below is already carrying the slide animation
+	left: 0;
+	right: 0;
+	margin-inline: auto;
+	max-width: 100%;
+	z-index: 999998;
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-sm, 0.5rem);
+	padding: var(--spacing-xs, 0.25rem) var(--spacing-sm, 0.5rem);
+	background: var(--nc-warn-bg);
+	color: var(--nc-warn);
+	border: 1px solid var(--nc-warn);
+	font-size: calc(var(--font-size-base, 1rem) * 0.875);
+	line-height: calc(var(--line-height-base, 1.5) * 0.875);
+	transform: translateY(-100%);
+	transition: transform 0.35s ease-out;
+
+	&.nc-update-banner-visible {
+		transform: translateY(0);
+	}
+
+	.nc-update-banner-text {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.nc-update-banner-actions {
+		flex: 0 0 auto;
+		display: flex;
+		align-items: center;
+		gap: var(--spacing-sm, 0.5rem);
+	}
+
+	button.link-brackets {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--nc-warn);
+		text-transform: uppercase;
+		cursor: pointer;
+		font-size: inherit;
+		font-family: inherit;
+
+		&:hover {
+			color: var(--nc-fg);
+		}
+
+		.inner::before {
+			content: "[";
+		}
+
+		.inner::after {
+			content: "]";
+		}
+	}
+
+	// Stack on narrow screens rather than crushing the message
+	@media (max-width: 480px) {
+		align-items: flex-start;
+		flex-wrap: wrap;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nc-update-banner {
+		transition: none;
+	}
+}
+
 /* Add a bit of extra theme styling */
 
 html[data-theme="poetry"],

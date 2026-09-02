@@ -29,6 +29,19 @@ const IS_BETA_SITE = window.location.hostname === 'beta.cyberspace.online';
 // Update check - stores remote version if newer, null if not checked, false if up to date
 let UPDATE_AVAILABLE = null; // null = not checked, false = up to date, string = new version
 
+const SCRIPT_URL_FALLBACK = 'https://raw.githubusercontent.com/z0mbieparade/cyberspace-nick-colors/refs/heads/main/cyberspace-nick-colors.user.js';
+function getScriptURL() {
+	const script = (typeof GM_info !== 'undefined' && GM_info.script) ? GM_info.script : null;
+	return (script && (script.downloadURL || script.updateURL)) || SCRIPT_URL_FALLBACK;
+}
+
+function getDismissedUpdateVersion() {
+	return _GM_getValue('dismissedUpdateVersion', '') || '';
+}
+function saveDismissedUpdateVersion(version) {
+	_GM_setValue('dismissedUpdateVersion', version);
+}
+
 // GM_xmlhttpRequest compatibility - support both Tampermonkey (GM_xmlhttpRequest) and Greasemonkey 4+ (GM.xmlHttpRequest)
 const gmXmlHttpRequest = (typeof GM_xmlhttpRequest !== 'undefined')
 	? GM_xmlhttpRequest
@@ -110,6 +123,7 @@ const CONTAINER_HINTS_EXCLUDE = [
 	'.sidebar',
 	'footer',
 	'.nc-dialog-attribution',
+	'.nc-update-banner',
 	'.editor-wrapper',
 	'code', 'pre', 'script'
 ];

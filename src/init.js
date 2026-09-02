@@ -108,31 +108,40 @@ if (registerMenuCommand) {
 	});
 }
 
-// Check for updates - can be called anytime
-function checkForUpdates() {
-	if (!gmXmlHttpRequest) return Promise.resolve();
+// Reads the @version out of a fetched copy of the script and records whether it's newer
+function applyUpdateCheckResult(scriptText) {
+	const match = scriptText.match(/@version\s+(\S+)/);
+	if (!match) return;
+	const remoteVersion = match[1];
+	UPDATE_AVAILABLE = isNewerVersion(remoteVersion, VERSION) ? remoteVersion : false;
+}
 
-	const fallbackURL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js';
-	const updateURL = (typeof GM_info !== 'undefined' && GM_info.script)
-		? (GM_info.script.updateURL || GM_info.script.downloadURL || fallbackURL)
-		: fallbackURL;
+// Check for updates - can be called anytime
+// Uses GM_xmlhttpRequest when the manager grants it, otherwise plain fetch (which works
+// because getScriptURL() avoids the github.com redirect that breaks CORS)
+function checkForUpdates() {
+	const updateURL = gmXmlHttpRequest ? getScriptURL() : SCRIPT_URL_FALLBACK;
 
 	return new Promise((resolve) => {
-		gmXmlHttpRequest({
-			method: 'GET',
-			url: updateURL,
-			onload: (response) => {
-				try {
-					const match = response.responseText.match(/@version\s+(\S+)/);
-					if (match) {
-						const remoteVersion = match[1];
-						UPDATE_AVAILABLE = (remoteVersion !== VERSION) ? remoteVersion : false;
-					}
-				} catch (e) { /* ignore */ }
-				resolve();
-			},
-			onerror: () => resolve()
-		});
+		if (gmXmlHttpRequest) {
+			gmXmlHttpRequest({
+				method: 'GET',
+				url: updateURL,
+				onload: (response) => {
+					try {
+						applyUpdateCheckResult(response.responseText);
+					} catch (e) { /* ignore */ }
+					resolve();
+				},
+				onerror: () => resolve()
+			});
+		} else {
+			fetch(updateURL)
+				.then(r => r.text())
+				.then(applyUpdateCheckResult)
+				.catch(e => logDebug('[Nick Colors] Update check failed:', e))
+				.finally(resolve);
+		}
 	});
 }
 
@@ -180,7 +189,9 @@ initCssVariables();
 // Initial colorization (after fetching overrides) and update check
 fetchOverrides().then(() => {
 	colorizeAll();
-	checkForUpdates();
+	checkForUpdates().then(() => {
+		if (UPDATE_AVAILABLE) showUpdateBanner(UPDATE_AVAILABLE);
+	});
 });
 
 // Watch for new content

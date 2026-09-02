@@ -28,8 +28,8 @@ const metadata = `// ==UserScript==
 // @match        https://cyberspace.online/*
 // @match        https://beta.cyberspace.online/*
 ${buildExcludeMetadata()}
-// @updateURL    https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js
-// @downloadURL  https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js
+// @updateURL    https://raw.githubusercontent.com/z0mbieparade/cyberspace-nick-colors/refs/heads/main/cyberspace-nick-colors.user.js
+// @downloadURL  https://raw.githubusercontent.com/z0mbieparade/cyberspace-nick-colors/refs/heads/main/cyberspace-nick-colors.user.js
 // @grant        GM_registerMenuCommand
 // @grant        GM.registerMenuCommand
 // @grant        GM_setValue
@@ -93,6 +93,7 @@ const codeParts = [
 	'nick-functions.js',
 	'slider-component.js',
 	'dialog-component.js',
+	'update-banner.js',
 	'settings-engine.js',
 	'user-settings-panel.js',
 	'site-settings-panel.js',

@@ -2,7 +2,7 @@
 // GM API FALLBACKS (for testing outside userscript manager)
 // =====================================================
 
-const GM_STORAGE_KEYS = ['debugMode', 'siteConfig', 'customNickColors'];
+const GM_STORAGE_KEYS = ['debugMode', 'siteConfig', 'customNickColors', 'dismissedUpdateVersion'];
 
 const _isThenable = (value) => !!value && typeof value.then === 'function';
 
@@ -775,6 +775,38 @@ function getEffectiveSiteConfig() {
 	}
 
 	return config;
+}
+
+/**
+ * Compares two dot-separated version strings numerically.
+ * Missing and non-numeric segments count as 0, so '1.3' and '1.3.0' are equal and
+ * '1.3.9' sorts below '1.3.10' (a plain string compare gets that backwards).
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} -1 when a < b, 1 when a > b, 0 when equal
+ */
+function compareVersions(a, b) {
+	// Tolerate a leading 'v' - a '@version v1.3.4' header would otherwise read as 0.3.4
+	// and silently never register as an update
+	const split = (version) => String(version ?? '').trim().replace(/^v/i, '').split('.');
+	const segmentsA = split(a);
+	const segmentsB = split(b);
+	const segmentCount = Math.max(segmentsA.length, segmentsB.length);
+
+	for (let i = 0; i < segmentCount; i++) {
+		const valueA = parseInt(segmentsA[i], 10) || 0;
+		const valueB = parseInt(segmentsB[i], 10) || 0;
+		if (valueA !== valueB) return valueA < valueB ? -1 : 1;
+	}
+	return 0;
+}
+
+/**
+ * True only when `remoteVersion` is a genuinely newer release than `localVersion`.
+ * Guards against a local dev build ahead of main prompting to "update" to an older one.
+ */
+function isNewerVersion(remoteVersion, localVersion) {
+	return compareVersions(remoteVersion, localVersion) > 0;
 }
 
 // Hash a string to a number (for consistent color generation)

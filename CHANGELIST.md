@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-09-02
+
+### Added
+- **Update banner** - a newer release now slides down a banner from the top of the page instead of only tinting the version number in a dialog footer nobody opens. `UPDATE` opens the new version to install, `LATER` hides it until the next page load, `x` hides it until something newer than that version ships
+- Section 7 of `tests/visual-test.html` shows the banner on demand, so it can be checked against every preset theme's warn colors
+- Tests for version comparison and the banner's show/dismiss rules
+
+### Fixed
+- **The update check never ran without `GM_xmlhttpRequest`** - it returned early, so anyone on a manager that doesn't grant it was never told about a new release. It now falls back to `fetch`
+- **The update check fired on any differing version, not a newer one** - a local build ahead of `main` prompted you to "update" backwards. Versions are now compared numerically per segment, so `1.3.10` correctly beats `1.3.9`
+- `@updateURL`/`@downloadURL` moved to `raw.githubusercontent.com`, so the URL the manager reports back through `GM_info` is one a plain `fetch` can actually read
+
+### Changed
+- The script's own download URL is built once in `getScriptURL()` rather than assembled from `GM_info` in two places
+
 ## [1.3.3] - 2026-09-02
+
+### Added
+- Tests for the GM storage shim covering sync `GM_*`, async `GM.*`, async `GM_*`, the no-manager localStorage fallback, and a `GM_getValue` that throws
 
 ### Fixed
 - **Settings failed to load on managers with an async `GM_*` API** - detection assumed the `GM_*` names meant synchronous functions, so a manager implementing them async handed callers a Promise and every read blew up with `Unexpected token 'o', "[object Promise]" is not valid JSON`. Which API is in use is now decided by probing what `GM_getValue` actually returns, so async `GM_*` routes through the same value cache as `GM.*`
@@ -13,9 +31,6 @@ All notable changes to this project will be documented in this file.
 - **Debug tracing is now behind debug mode** - theme variable dumps, remote override counts, theme change records, the nick picker's color calculation dump, and the C-Mail compose traces all logged to the console unconditionally. `[Nick Colors] Loaded.` and genuine errors still always log
 - `_hasOldGM`/`_hasNewGM` renamed to `_hasSyncGM`/`_hasAsyncGM` - whether the names exist was never the real question, how they behave is
 - The persisted storage key list is now `GM_STORAGE_KEYS` instead of being repeated in three places
-
-### Added
-- Tests for the GM storage shim covering sync `GM_*`, async `GM.*`, async `GM_*`, the no-manager localStorage fallback, and a `GM_getValue` that throws
 
 ## [1.3.2]
 

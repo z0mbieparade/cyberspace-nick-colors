@@ -38,6 +38,10 @@ global.localStorage = dom.window.localStorage;
 global.getComputedStyle = dom.window.getComputedStyle;
 global.MutationObserver = dom.window.MutationObserver;
 global.navigator = dom.window.navigator;
+// jsdom only provides rAF in visual mode; a timeout is close enough for these tests
+global.requestAnimationFrame = dom.window.requestAnimationFrame
+	? dom.window.requestAnimationFrame.bind(dom.window)
+	: (callback) => setTimeout(() => callback(Date.now()), 0);
 
 // Mock GM APIs
 global.GM_setValue = (key, value) => localStorage.setItem('nickColors_' + key, value);
@@ -61,14 +65,20 @@ const sourceFiles = [
 	'nick-functions.js',
 	'slider-component.js',
 	'dialog-component.js',
+	'update-banner.js',
 	'settings-engine.js',
 	'user-settings-panel.js',
 	'site-settings-panel.js',
 	// Note: init.js is excluded as it has side effects
 ];
 
+// build.js injects VERSION into the bundle's IIFE wrapper, so tests need it too.
+// Deliberately a fixed fixture rather than package.json's version - tests assert against
+// versions either side of it, and those shouldn't need editing on every release bump.
+export const TEST_VERSION = '1.3.3';
+
 // Concatenate all source files
-let code = buildExclusionsCode() + '\n\n';
+let code = `const VERSION = '${TEST_VERSION}';\n\n` + buildExclusionsCode() + '\n\n';
 for (const file of sourceFiles) {
 	const filePath = join(SRC_DIR, file);
 	try {
@@ -107,6 +117,15 @@ const script = new Function(code + `
 		hashString,
 		getThemeColors,
 		getThemeDefaultSettings,
+		compareVersions,
+		isNewerVersion,
+
+		// Update banner
+		showUpdateBanner,
+		getScriptURL,
+		getDismissedUpdateVersion,
+		saveDismissedUpdateVersion,
+		UPDATE_BANNER_ID,
 
 		// Import/Export
 		getNonDefaultValues,
