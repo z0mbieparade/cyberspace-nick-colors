@@ -105,7 +105,7 @@ function isLikelyUsername(element) {
 }
 
 function colorizeAll() {
-	if (isPathMatch(PATH_EXCLUDE)) return;
+	if (isHostMatch(HOST_EXCLUDE) || isPathMatch(PATH_EXCLUDE)) return;
 
 	const selector = USERNAME_SELECTORS.join(', ');
 

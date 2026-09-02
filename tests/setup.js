@@ -7,7 +7,11 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { createRequire } from 'module';
 import { JSDOM } from 'jsdom';
+
+// Same generated exclusion constants the build injects into the bundle
+const { buildExclusionsCode } = createRequire(import.meta.url)('../exclusions.js');
 
 // Create a jsdom instance with a basic HTML structure
 const dom = new JSDOM(`
@@ -64,7 +68,7 @@ const sourceFiles = [
 ];
 
 // Concatenate all source files
-let code = '';
+let code = buildExclusionsCode() + '\n\n';
 for (const file of sourceFiles) {
 	const filePath = join(SRC_DIR, file);
 	try {
@@ -86,6 +90,7 @@ const script = new Function(code + `
 		getRelativeLuminance,
 		getContrastRatio,
 		isPathMatch,
+		isHostMatch,
 		toKebabCase,
 		toCamelCase,
 		stylesToCssString,
@@ -137,6 +142,7 @@ const script = new Function(code + `
 		MANUAL_OVERRIDES,
 		PATH_HINTS,
 		PATH_EXCLUDE,
+		HOST_EXCLUDE,
 	});
 `);
 

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.2]
+
+### Added
+- **Host exclusion list** - `HOST_EXCLUDE` skips whole subdomains, matching the host and any of its subdomains; `page.cyberspace.online` and `terminal.cyberspace.online` are excluded
+- `/pages` added to `PATH_EXCLUDE`
+- Excluded hosts and paths now live in `src/exclusions.json`, the single source for both the userscript `@exclude` header lines (generated at build time) and the `HOST_EXCLUDE`/`PATH_EXCLUDE` constants in the bundle
+
 ## [1.3.1] - 2026-08-08
 
 ### Added

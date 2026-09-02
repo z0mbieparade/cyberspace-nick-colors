@@ -101,11 +101,6 @@ const PATH_HINTS = [
 ];
 
 
-// Ignore these pages
-const PATH_EXCLUDE = [
-	'/terminal',                    // canvas-rendered terminal emulator
-];
-
 // Containers to EXCLUDE from coloring (applies to both links and @mentions)
 const CONTAINER_HINTS_EXCLUDE = [
 	'.sidebar',

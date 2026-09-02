@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { minify } = require('terser');
 const sass = require('sass');
+const { buildExcludeMetadata, buildExclusionsCode } = require('./exclusions');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const OUTPUT_FILE = path.join(__dirname, 'cyberspace-nick-colors.user.js');
@@ -26,6 +27,7 @@ const metadata = `// ==UserScript==
 // @description  Consistent bright colors for usernames across the site
 // @match        https://cyberspace.online/*
 // @match        https://beta.cyberspace.online/*
+${buildExcludeMetadata()}
 // @updateURL    https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js
 // @downloadURL  https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/cyberspace-nick-colors.user.js
 // @grant        GM_registerMenuCommand
@@ -77,6 +79,9 @@ const codeParts = [
 
 	// Inject compiled styles first
 	styleInjection,
+
+	// HOST_EXCLUDE / PATH_EXCLUDE, generated from src/exclusions.json
+	buildExclusionsCode(),
 
 	// Source files (in order)
 	'helper-functions.js',

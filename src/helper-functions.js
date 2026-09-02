@@ -536,6 +536,20 @@ function isPathMatch(paths) {
 	});
 }
 
+// Check whether the current hostname matches one of the given hosts.
+// Matches the host itself and any of its subdomains, so 'page.cyberspace.online'
+// matches 'page.cyberspace.online' and 'x.page.cyberspace.online',
+// but not 'mypage.cyberspace.online'.
+function isHostMatch(hosts) {
+	if (!hosts || hosts.length === 0) return false;
+	const currentHost = window.location.hostname.toLowerCase();
+	return hosts.some(host => {
+		const pattern = host.toLowerCase();
+		if (!pattern) return false;
+		return currentHost === pattern || currentHost.endsWith('.' + pattern);
+	});
+}
+
 // Convert camelCase to kebab-case
 function toKebabCase(str) {
 	return str.replace(/([A-Z])/g, '-$1').toLowerCase();

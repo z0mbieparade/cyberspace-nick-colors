@@ -284,6 +284,27 @@ describe('DOM manipulation', () => {
 			expect(PATH_EXCLUDE).toContain('/terminal');
 		});
 
+		it('/pages is in the exclude list', () => {
+			expect(PATH_EXCLUDE).toContain('/pages');
+		});
+
+		it('does not colorize nicks on /pages or its sub-paths', () => {
+			for (const path of ['/pages', '/pages/some-page']) {
+				goToPath(path);
+				document.body.innerHTML = `
+					<div class="chat-main-content">
+						<a href="/user1">user1</a>
+					</div>
+				`;
+
+				colorizeAll();
+
+				const nick = document.querySelector('a');
+				expect(nick.dataset.nickColored).toBeUndefined();
+				expect(nick.style.color).toBe('');
+			}
+		});
+
 		it('does not colorize nicks on an excluded page', () => {
 			goToPath('/terminal');
 			document.body.innerHTML = `
@@ -321,6 +342,50 @@ describe('DOM manipulation', () => {
 			goToPath('/chat/general');
 			colorizeAll();
 			expect(document.querySelector('a').dataset.nickColored).toBe('true');
+		});
+	});
+
+	describe('excluded hosts', () => {
+		const goToUrl = (url) => dom.reconfigure({ url });
+		afterEach(() => goToPath('/'));
+
+		it('page.cyberspace.online is in the exclude list', () => {
+			expect(HOST_EXCLUDE).toContain('page.cyberspace.online');
+		});
+
+		it('matches the host and its subdomains, but not lookalikes', () => {
+			goToUrl('https://page.cyberspace.online/');
+			expect(isHostMatch(HOST_EXCLUDE)).toBe(true);
+
+			goToUrl('https://user.page.cyberspace.online/some/path');
+			expect(isHostMatch(HOST_EXCLUDE)).toBe(true);
+
+			goToUrl('https://mypage.cyberspace.online/');
+			expect(isHostMatch(HOST_EXCLUDE)).toBe(false);
+
+			goToUrl('https://cyberspace.online/chat/general');
+			expect(isHostMatch(HOST_EXCLUDE)).toBe(false);
+		});
+
+		it('returns false for an empty or missing list', () => {
+			goToUrl('https://page.cyberspace.online/');
+			expect(isHostMatch([])).toBe(false);
+			expect(isHostMatch(null)).toBe(false);
+		});
+
+		it('does not colorize nicks on an excluded host', () => {
+			goToUrl('https://page.cyberspace.online/anything');
+			document.body.innerHTML = `
+				<div class="chat-main-content">
+					<a href="/user1">user1</a>
+				</div>
+			`;
+
+			colorizeAll();
+
+			const nick = document.querySelector('a');
+			expect(nick.dataset.nickColored).toBeUndefined();
+			expect(nick.style.color).toBe('');
 		});
 	});
 
