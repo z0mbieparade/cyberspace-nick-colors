@@ -12,7 +12,7 @@ function createDebugPre(data, classes = '') {
 	if (typeof data === 'string') {
 		return `<div class="${classStr}"${hiddenStyle}>${data}</div>`;
 	}
-	console.log(data);
+	logDebug(data);
 	const lines = Object.entries(data)
 		.map(([label, value]) => {
 			if(typeof value === 'object' && (value.txt !== undefined || value.elem !== undefined))
@@ -42,7 +42,7 @@ function getOrCreateDebugPre(parent, classes = '') {
 	return debug;
 }
 
-function logDebug(id, data)
+function recordDebug(id, data)
 {
 	DEBUG_LOG.push({
 		timestamp: new Date().toISOString(),
@@ -58,18 +58,18 @@ function exportDebug()
 		return;
 	}
 
-	logDebug('Info', {
+	recordDebug('Info', {
 		browser: navigator.userAgent,
 		url: window.location.href,
 		version: VERSION,
 	});
 
-	logDebug('Site Theme', siteTheme);
-	logDebug('Site Config', siteConfig);
-	logDebug('Effective Site Config', getEffectiveSiteConfig());
-	logDebug('Style Config', siteConfig);
-	logDebug('Custom Nick Colors', customNickColors);
-	logDebug('Manual Overrides', MANUAL_OVERRIDES);
+	recordDebug('Site Theme', siteTheme);
+	recordDebug('Site Config', siteConfig);
+	recordDebug('Effective Site Config', getEffectiveSiteConfig());
+	recordDebug('Style Config', siteConfig);
+	recordDebug('Custom Nick Colors', customNickColors);
+	recordDebug('Manual Overrides', MANUAL_OVERRIDES);
 
 	console.log("Exporting debug info...");
 	console.log(DEBUG_LOG);

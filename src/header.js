@@ -15,9 +15,13 @@ function saveDebugMode() {
 	_GM_setValue('debugMode', DEBUG ? 'true' : 'false');
 }
 
+function logDebug(...args) {
+	if (DEBUG) console.log(...args);
+}
+
 // URL to fetch manual overrides from (set to null to disable)
 // Host your overrides.json on GitHub, Gist, or any CORS-friendly location
-const OVERRIDES_URL = 'https://github.com/z0mbieparade/cyberspace-nick-colors/raw/refs/heads/main/overrides.json';
+const OVERRIDES_URL = 'https://raw.githubusercontent.com/z0mbieparade/cyberspace-nick-colors/refs/heads/main/overrides.json';
 
 // Detect if we're on the beta site (different HTML structure)
 const IS_BETA_SITE = window.location.hostname === 'beta.cyberspace.online';
@@ -201,7 +205,7 @@ loadSiteCustomTheme();
 
 function loadSiteTheme() {
 	const themeColors = getThemeColors();
-	console.log('[Nick Colors] Theme variables:', themeColors);
+	logDebug('[Nick Colors] Theme variables:', themeColors);
 	if (themeColors && themeColors.fg && themeColors.bg) {
 		siteThemeName = document.documentElement?.dataset?.theme || null;
 		siteTheme = { ...themeColors };

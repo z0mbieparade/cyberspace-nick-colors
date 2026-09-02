@@ -149,7 +149,7 @@ function fetchOverrides() {
 					try {
 						const remoteOverrides = JSON.parse(response.responseText);
 						MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
-						console.log('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
+						logDebug('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
 					} catch (e) {
 						console.error('[Nick Colors] Failed to parse remote overrides:', e);
 					}
@@ -166,7 +166,7 @@ function fetchOverrides() {
 				.then(r => r.json())
 				.then(remoteOverrides => {
 					MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
-					console.log('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
+					logDebug('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
 				})
 				.catch(e => console.error('[Nick Colors] Failed to fetch remote overrides:', e))
 				.finally(resolve);
@@ -206,7 +206,7 @@ observer.observe(document.body, {
 const themeObserver = new MutationObserver((mutations) => {
 	for (const mutation of mutations) {
 		if (mutation.attributeName === 'data-theme') {
-			console.log('[Nick Colors] Theme changed, refreshing colors', mutation);
+			logDebug('[Nick Colors] Theme changed, refreshing colors', mutation);
 			siteThemeName = mutation.target.getAttribute('data-theme') || null;
 			loadSiteCustomTheme();
 			loadSiteTheme();

@@ -2,7 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.1.2]
+## [1.3.3] - 2026-09-02
+
+### Fixed
+- **Settings failed to load on managers with an async `GM_*` API** - detection assumed the `GM_*` names meant synchronous functions, so a manager implementing them async handed callers a Promise and every read blew up with `Unexpected token 'o', "[object Promise]" is not valid JSON`. Which API is in use is now decided by probing what `GM_getValue` actually returns, so async `GM_*` routes through the same value cache as `GM.*`
+- **Remote overrides never loaded without `GM_xmlhttpRequest`** - `OVERRIDES_URL` pointed at `github.com/.../raw/...`, which 302-redirects with an empty `Access-Control-Allow-Origin` and kills the plain `fetch` fallback used when a manager doesn't grant `GM_xmlhttpRequest`. It now points at `raw.githubusercontent.com` directly
+- Async storage writes are fire-and-forget but no longer uncaught, so a rejecting manager can't surface as an unhandled rejection
+
+### Changed
+- **Debug tracing is now behind debug mode** - theme variable dumps, remote override counts, theme change records, the nick picker's color calculation dump, and the C-Mail compose traces all logged to the console unconditionally. `[Nick Colors] Loaded.` and genuine errors still always log
+- `_hasOldGM`/`_hasNewGM` renamed to `_hasSyncGM`/`_hasAsyncGM` - whether the names exist was never the real question, how they behave is
+- The persisted storage key list is now `GM_STORAGE_KEYS` instead of being repeated in three places
+
+### Added
+- Tests for the GM storage shim covering sync `GM_*`, async `GM.*`, async `GM_*`, the no-manager localStorage fallback, and a `GM_getValue` that throws
+
+## [1.3.2]
 
 ### Added
 - **Host exclusion list** - `HOST_EXCLUDE` skips whole subdomains, matching the host and any of its subdomains; `page.cyberspace.online` and `terminal.cyberspace.online` are excluded

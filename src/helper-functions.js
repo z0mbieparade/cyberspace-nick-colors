@@ -2,24 +2,53 @@
 // GM API FALLBACKS (for testing outside userscript manager)
 // =====================================================
 
+const GM_STORAGE_KEYS = ['debugMode', 'siteConfig', 'customNickColors'];
+
+const _isThenable = (value) => !!value && typeof value.then === 'function';
+
 // Detect which GM API is available:
 // 1. Old style: GM_setValue/GM_getValue (synchronous)
 // 2. New style: GM.setValue/GM.getValue (async/Promise-based)
 // 3. Fallback: localStorage
-const _hasOldGM = typeof GM_setValue === 'function';
-const _hasNewGM = typeof GM !== 'undefined' && typeof GM.setValue === 'function';
+//
+// Existence is NOT enough to call GM_getValue synchronous! Some managers expose the
+// GM_* names but implement them async, which used to hand callers a Promise that then
+// blew up in JSON.parse as "[object Promise]". Probe the actual return value instead.
+const _hasSyncGM = (() => {
+	if (typeof GM_getValue !== 'function' || typeof GM_setValue !== 'function') return false;
+	try {
+		return !_isThenable(GM_getValue('__nc_api_probe', null));
+	} catch (e) {
+		return false;
+	}
+})();
+
+// Async storage accessors, whichever spelling this manager provides
+const _asyncGetValue = (typeof GM !== 'undefined' && typeof GM.getValue === 'function') ? (key) => GM.getValue(key) :
+	(typeof GM_getValue === 'function') ? (key) => Promise.resolve(GM_getValue(key)) :
+	null;
+const _asyncSetValue = (typeof GM !== 'undefined' && typeof GM.setValue === 'function') ? (key, value) => GM.setValue(key, value) :
+	(typeof GM_setValue === 'function') ? (key, value) => Promise.resolve(GM_setValue(key, value)) :
+	null;
+
+const _hasAsyncGM = !_hasSyncGM && !!_asyncGetValue && !!_asyncSetValue;
 
 // Wrapper functions that handle both sync and async APIs uniformly
 // For setValue: fire-and-forget (don't need to wait), also update cache
-const _GM_setValue = _hasOldGM ? GM_setValue :
-	_hasNewGM ? (key, value) => { _gmCache[key] = value; GM.setValue(key, value); } :
+const _GM_setValue = _hasSyncGM ? GM_setValue :
+	_hasAsyncGM ? (key, value) => {
+		// Cache first so reads are correct immediately; the write is fire-and-forget,
+		// but still catch so a rejecting manager doesn't surface as an unhandled rejection
+		_gmCache[key] = value;
+		Promise.resolve(_asyncSetValue(key, value)).catch(e => console.error('[Nick Colors] Failed to save ' + key + ':', e));
+	} :
 	(key, value) => localStorage.setItem('nickColors_' + key, value);
 
 // For getValue: need async handling for new API
 // We'll use a sync wrapper that returns cached values, with async refresh
 let _gmCache = {};
-const _GM_getValue = _hasOldGM ? GM_getValue :
-	_hasNewGM ? (key, defaultValue) => {
+const _GM_getValue = _hasSyncGM ? GM_getValue :
+	_hasAsyncGM ? (key, defaultValue) => {
 		// Return cached value if available, otherwise default
 		// Cache is populated by _initGMCache()
 		return (key in _gmCache) ? _gmCache[key] : defaultValue;
@@ -31,11 +60,10 @@ const _GM_getValue = _hasOldGM ? GM_getValue :
 
 // Async initialization for new GM API - loads all values into cache
 async function _initGMCache() {
-	if (!_hasNewGM) return;
+	if (!_hasAsyncGM) return;
 	try {
-		const keys = ['debugMode', 'siteConfig', 'customNickColors'];
-		for (const key of keys) {
-			const val = await GM.getValue(key);
+		for (const key of GM_STORAGE_KEYS) {
+			const val = await _asyncGetValue(key);
 			if (val !== undefined) _gmCache[key] = val;
 		}
 	} catch (e) {
@@ -45,22 +73,20 @@ async function _initGMCache() {
 
 // Migrate data from localStorage to GM storage (one-time migration)
 async function _migrateFromLocalStorage() {
-	const keys = ['debugMode', 'siteConfig', 'customNickColors'];
-
-	for (const key of keys) {
+	for (const key of GM_STORAGE_KEYS) {
 		const lsKey = 'nickColors_' + key;
 		const lsVal = localStorage.getItem(lsKey);
 
 		if (lsVal !== null) {
 			// Check if GM storage already has this key
-			const gmVal = _hasNewGM ? await GM.getValue(key) : _GM_getValue(key, null);
+			const gmVal = _hasAsyncGM ? await _asyncGetValue(key) : _GM_getValue(key, null);
 
 			if (gmVal === undefined || gmVal === null) {
 				// Migrate from localStorage to GM
-				if (_hasNewGM) {
-					await GM.setValue(key, lsVal);
+				if (_hasAsyncGM) {
+					await _asyncSetValue(key, lsVal);
 					_gmCache[key] = lsVal;
-				} else if (_hasOldGM) {
+				} else if (_hasSyncGM) {
 					GM_setValue(key, lsVal);
 				}
 			}
@@ -69,7 +95,7 @@ async function _migrateFromLocalStorage() {
 }
 
 // Initialize cache and run migration if using new GM API
-if (_hasNewGM) {
+if (_hasAsyncGM) {
 	_initGMCache().then(async () => {
 		// Try to migrate from localStorage
 		await _migrateFromLocalStorage();
@@ -79,7 +105,7 @@ if (_hasNewGM) {
 		if (typeof loadCustomNickColors === 'function') loadCustomNickColors();
 		if (typeof colorizeAll === 'function') colorizeAll();
 	});
-} else if (_hasOldGM) {
+} else if (_hasSyncGM) {
 	// Also migrate for old GM API
 	_migrateFromLocalStorage();
 }
