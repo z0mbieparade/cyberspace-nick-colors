@@ -14,7 +14,7 @@
 	* @param {string} opts.label - Label text
 	* @param {string} opts.id - Input element ID
 	* @param {string} [opts.type='text'] - Input type: text, textarea, select, toggle, tristate, button
-	* @param {string} [opts.value=''] - Input value (for text/textarea)
+	* @param {string} [opts.value=''] - Input value (for text/textarea), as text: escaped here
 	* @param {string} [opts.placeholder=''] - Placeholder text
 	* @param {string} [opts.hint=''] - Hint text below input
 	* @param {string} [opts.classes=''] - Additional CSS classes
@@ -22,7 +22,7 @@
 	* @param {boolean} [opts.checked=false] - Checked state for toggle type
 	* @param {boolean} [opts.disabled=false] - Disabled state for toggle type
 	* @param {boolean|null} [opts.state=null] - State for tristate (null=auto, true, false)
-	* @param {string} [opts.defaultLabel=''] - Default label shown for tristate
+	* @param {string} [opts.defaultLabel=''] - Default label shown for tristate, as text: escaped here
 	* @param {string} [opts.buttonText=''] - Button text for button type
 	* @param {boolean} [opts.stacked=false] - Force stacked layout (label on top)
 	* @returns {string} HTML string
@@ -41,11 +41,11 @@ function createInputRow(opts) {
 		const classStr = `nc-input-row-stacked${classes ? ' ' + classes : ''}`;
 		let inputHtml;
 		if (type === 'textarea') {
-			inputHtml = `<textarea id="${id}" placeholder="${placeholder}">${value}</textarea>`;
+			inputHtml = `<textarea id="${id}" placeholder="${placeholder}">${escapeHtml(value)}</textarea>`;
 		} else if (type === 'select' && options) {
 			inputHtml = `<select id="${id}">${options}</select>`;
 		} else {
-			inputHtml = `<input type="${type}" id="${id}" value="${value}" placeholder="${placeholder}">`;
+			inputHtml = `<input type="${type}" id="${id}" value="${escapeHtml(value)}" placeholder="${placeholder}">`;
 		}
 		return `
 			<div class="${classStr}">
@@ -80,7 +80,7 @@ function createInputRow(opts) {
 		const thumbPosClass = state === true ? 'pos-end' : state === false ? 'pos-start' : 'pos-middle';
 		return `
 			<div class="${classStr}">
-				<label>${label}${defaultLabel ? ` <span class="nc-text-dim">(default: ${defaultLabel})</span>` : ''}</label>
+				<label>${label}${defaultLabel ? ` <span class="nc-text-dim">(default: ${escapeHtml(defaultLabel)})</span>` : ''}</label>
 				<label class="nc-toggle-label">
 					<div class="nc-toggle-value">${stateText}</div>
 					<input type="checkbox" id="${id}" class="nc-sr-only" ${isChecked ? 'checked' : ''}>
@@ -140,7 +140,10 @@ function createDialog(opts) {
 					<span>created by <a href="/z0ylent">@z0ylent</a></span>
 					<span><a href="https://z0m.bi" target="_blank">https://z0m.bi</a></span>
 					<span><a class="github-link" href="https://github.com/z0mbieparade/cyberspace-nick-colors" target="_blank" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" height="14px"> <path fill="currentColor" d="M5 2h4v2H7v2H5V2Zm0 10H3V6h2v6Zm2 2H5v-2h2v2Zm2 2v-2H7v2H3v-2H1v2h2v2h4v4h2v-4h2v-2H9Zm0 0v2H7v-2h2Zm6-12v2H9V4h6Zm4 2h-2V4h-2V2h4v4Zm0 6V6h2v6h-2Zm-2 2v-2h2v2h-2Zm-2 2v-2h2v2h-2Zm0 2h-2v-2h2v2Zm0 0h2v4h-2v-4Z"/> </svg></a></span>
-					<span class="nc-version-link${UPDATE_AVAILABLE ? ' nc-update-available' : ''}" title="${UPDATE_AVAILABLE ? `Update available: v${UPDATE_AVAILABLE} (click to update)` : 'Up to date'}">v${VERSION}</span>
+					<span class="nc-version-link${UPDATE_AVAILABLE ? ' nc-update-available' : ''}" title="${UPDATE_AVAILABLE ? `Update available: v${escapeHtml(UPDATE_AVAILABLE)} (click to update)` : 'Up to date'}">v${VERSION}</span>
+				</div>
+				<div class="nc-dialog-deprecated hint">
+					Nick Colors is deprecated. Please <button type="button" class="nc-export-settings nc-text-link">export your settings</button> and <a href="${ATMOMOD_INSTALL_URL}" target="_blank" rel="noopener">install the new Atmospheric Modulator userscript</a>.
 				</div>
 				<hr />
 				<div class="buttons nc-flex nc-flex-wrap nc-items-center nc-gap-2">
@@ -179,6 +182,8 @@ function createDialog(opts) {
 	if (helpBtn) {
 		helpBtn.addEventListener('click', showHelpDialog);
 	}
+
+	overlay.querySelector('.nc-export-settings').addEventListener('click', exportSettingsToFile);
 
 	// Version link - click to open update page, re-check if not yet checked
 	const versionLink = overlay.querySelector('.nc-version-link');

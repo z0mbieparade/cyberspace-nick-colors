@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.5] - 2026-10-05
+
+Last release. Nick Colors lives on in [Cyberspace Atmospheric Modulator](https://github.com/z0mbieparade/cyberspace-atmospheric-modulator).
+
+### Added
+- **Migration banner** - asks you to move to Atmospheric Modulator, with an **export your settings** link that downloads your settings file, and `INSTALL` and `HOW TO MOVE` links. `LATER` hides it until the next page load, `x` for good
+- The settings and per-user dialog footers say Nick Colors is deprecated, with an **export your settings** link, which downloads your settings file, and links to install Atmospheric Modulator and reimport them
+
+### Changed
+- Remote overrides load from Atmospheric Modulator's `overrides.json`, so both scripts share one list
+
+### Security
+- Settings files, pasted settings, stored settings and remote overrides are checked as they load: site settings keep only known keys of the right type, clamped to their range. Imported and remote user styles keep only colors, fonts, spacing, decoration, icons and notes, within length limits, and drop any CSS value with `url(`, `image-set(`, `expression(`, `javascript:`, `\`, `;`, `{`, `}`, `<`, `>`, a line break or another control character. An import says how many styles it left out
+- Custom CSS typed in a user dialog can't set position, offsets, `z-index`, transforms, `filter`, `offset-path`, logical insets or `content`, in any vendor-prefixed spelling. It can still set size and spacing. Save says what it left out
+- **Styles already saved lose any blocked property or unsafe value when 1.3.5 loads**, such as a `transform` or a `background-image: url(...)`. Storage cannot tell your own CSS from an old shared theme's
+- Usernames that are built-in object properties, such as `__proto__`, `constructor`, `toString` or `valueOf`, are ignored, along with any style saved for them
+- Usernames, saved styles, icons, input values and the update version are escaped before they go into dialog HTML
+- A style's `data` key no longer writes `data-*` attributes onto names
+
 ## [1.3.4] - 2026-09-02
 
 ### Added

@@ -150,23 +150,26 @@ function importSettings(data) {
 				delete siteConfig[key];
 			}
 			// Apply defaults then imported values
-			Object.assign(siteConfig, DEFAULT_SITE_CONFIG, data.siteConfig);
+			Object.assign(siteConfig, DEFAULT_SITE_CONFIG, sanitizeSiteConfig(data.siteConfig));
 			saveSiteConfig();
 		}
 
 		// Import custom nick colors (mutate in place to preserve references)
+		let dropped = 0;
 		if (data.customNickColors) {
+			const imported = sanitizeNickStyles(data.customNickColors, 'imported');
+			dropped = countDroppedStyles(data.customNickColors, imported);
 			// Clear existing properties
 			for (const key in customNickColors) {
 				delete customNickColors[key];
 			}
-			Object.assign(customNickColors, data.customNickColors);
+			Object.assign(customNickColors, imported);
 			saveCustomNickColors();
 		}
 
 		refreshAllColors();
 		const migrationNote = isV1 ? ' (migrated from v1)' : '';
-		return { success: true, message: `Settings imported successfully${migrationNote}` };
+		return { success: true, message: `Settings imported successfully${migrationNote}${droppedStylesNote(dropped, 'imported')}` };
 	} catch (e) {
 		return { success: false, message: `Import failed: ${e.message}` };
 	}
@@ -303,6 +306,15 @@ function downloadText(text, filename) {
  */
 function saveToFile(data, filename) {
 	downloadJson(minifyKeys(data), filename);
+}
+
+/**
+ * Download every setting as a dated settings file.
+ * Side effects: starts a file download
+ */
+function exportSettingsToFile() {
+	const timestamp = new Date().toISOString().slice(0, 10);
+	saveToFile(exportSettings(), `nick-colors-settings-${timestamp}.json`);
 }
 
 /**

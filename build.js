@@ -85,6 +85,7 @@ const codeParts = [
 
 	// Source files (in order)
 	'helper-functions.js',
+	'sanitize.js',
 	'header.js',
 	'import-export.js',
 	'send-message.js',

@@ -78,10 +78,10 @@ function createUserSettingsPanel(username, currentStyles)
 	let colorSourceData = '';
 	if (customNickColors[username]) {
 		colorSource = 'customNickColors (local save)';
-		colorSourceData = JSON.stringify(customNickColors[username]);
+		colorSourceData = escapeHtml(JSON.stringify(customNickColors[username]));
 	} else if (MANUAL_OVERRIDES[username]) {
 		colorSource = 'MANUAL_OVERRIDES (remote)';
-		colorSourceData = JSON.stringify(MANUAL_OVERRIDES[username]);
+		colorSourceData = escapeHtml(JSON.stringify(MANUAL_OVERRIDES[username]));
 	}
 
 	// Get hash values for debug
@@ -93,15 +93,15 @@ function createUserSettingsPanel(username, currentStyles)
 	// Build icon picker HTML helper
 	const buildIconPicker = (targetId) => {
 		if (!siteConfig.iconSet) return '';
-		return `<div class="picker-icon-options" data-target="${targetId}" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${siteConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--nc-border); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${icon}</span>`).join('')}</div>`;
+		return `<div class="picker-icon-options" data-target="${targetId}" style="display: flex; flex-wrap: wrap; gap: 0.25em; margin-bottom: 0.5rem;">${siteConfig.iconSet.split(/\s+/).filter(Boolean).map(icon => `<span class="nc-icon-option" style="cursor: pointer; padding: 0.2em 0.4em; border: 1px solid var(--nc-border); border-radius: var(--radius-md); transition: background 0.15s, border-color 0.15s;" title="Click to select">${escapeHtml(icon)}</span>`).join('')}</div>`;
 	};
 
 	const dialog = createDialog({
-		title: `Nick: ${username}`,
+		title: `Nick: ${escapeHtml(username)}`,
 		width: '350px',
 		onSettings: () => createSettingsPanel(),
-		preview: `<div class="preview">&lt;<span id="picker-preview">${username}</span>&gt; Example chat message in cIRC<br />Inline mention <span id="picker-preview-mention">@${username}</span> example</div>
-			<div class="preview preview-inverted" id="picker-preview-inverted">&lt;<span id="picker-preview-inverted-nick">${username}</span>&gt; Inverted container preview</div>`,
+		preview: `<div class="preview">&lt;<span id="picker-preview">${escapeHtml(username)}</span>&gt; Example chat message in cIRC<br />Inline mention <span id="picker-preview-mention">@${escapeHtml(username)}</span> example</div>
+			<div class="preview preview-inverted" id="picker-preview-inverted">&lt;<span id="picker-preview-inverted-nick">${escapeHtml(username)}</span>&gt; Inverted container preview</div>`,
 		content: `
 			${createDebugPre({
 				'Color Source': colorSource,
@@ -121,7 +121,7 @@ function createUserSettingsPanel(username, currentStyles)
 				},
 				'Style Variations': `weight:${hashWeight} italic:${hashItalic} case:${hashCase}`
 			})}
-			${hasRemoteOverride ? `<div class="hint">Site-wide override: <code style="background: var(--nc-code-bg); padding: 0.1em 0.3em;">${remoteOverrideText}</code><br>Your changes will override this locally.</div>` : ''}
+			${hasRemoteOverride ? `<div class="hint">Site-wide override: <code style="background: var(--nc-code-bg); padding: 0.1em 0.3em;">${escapeHtml(remoteOverrideText)}</code><br>Your changes will override this locally.</div>` : ''}
 			${eff.useSingleColor ? `
 			<div class="nc-dialog-info" style="padding: 0.5rem;">
 				Per-user color customization is disabled. Monochrome mode is enabled.<br>
@@ -142,51 +142,10 @@ function createUserSettingsPanel(username, currentStyles)
 		`,
 		buttons: [
 			{ label: 'Save', class: 'save', onClick: (close) => {
-				const textColor = getTextColor();
-				const styles = { ...cssStringToStyles(engine.getFieldValue('customCss') || '') };
-				if (textColor) styles.color = textColor;
-				// Add prepend icon based on tri-state: null = auto (don't save), true = custom, false = disabled
-				const prependIconState = engine.getFieldValue('prependIconEnabled');
-				if (prependIconState === true) {
-					styles.prependIcon = engine.getFieldValue('prependIcon')?.trim() || '';
-				} else if (prependIconState === false) {
-					styles.prependIcon = ''; // Explicitly disabled
-				}
-				// Add append icon based on tri-state
-				const appendIconState = engine.getFieldValue('appendIconEnabled');
-				if (appendIconState === true) {
-					styles.appendIcon = engine.getFieldValue('appendIcon')?.trim() || '';
-				} else if (appendIconState === false) {
-					styles.appendIcon = ''; // Explicitly disabled
-				}
-				// Add style variations if explicitly set (not auto)
-				const weightState = engine.getFieldValue('fontWeight');
-				const italicState = engine.getFieldValue('fontStyle');
-				const caseState = engine.getFieldValue('fontVariant');
-				const invertState = engine.getFieldValue('invert');
-				if (weightState !== null) {
-					styles.fontWeight = weightState ? 'bold' : 'normal';
-				}
-				if (italicState !== null) {
-					styles.fontStyle = italicState ? 'italic' : 'normal';
-				}
-				if (caseState !== null) {
-					styles.fontVariant = caseState ? 'small-caps' : 'normal';
-				}
-				if (invertState !== null) {
-					styles.invert = invertState;
-				}
-				// Add fontFamily based on tri-state: null = auto (don't save), true = custom, false = disabled
-				const customFontFamilyState = engine.getFieldValue('customFontFamily');
-				if (customFontFamilyState === true) {
-					styles.fontFamily = engine.getFieldValue('fontFamily')?.trim() || '';
-				} else if (customFontFamilyState === false) {
-					styles.fontFamily = ''; // Explicitly disabled
-				}
-				const userNotes = engine.getFieldValue('userNotes')?.trim();
-				if (userNotes) {
-					styles.userNotes = userNotes;
-				}
+				const typed = buildCurrentStyles();
+				const styles = sanitizeNickStyle(typed, 'typed') ?? {};
+				const dropped = countDroppedStyles({ [username]: typed }, { [username]: styles });
+				if (dropped) alert(`Saved.${droppedStylesNote(dropped, 'typed')}`);
 				customNickColors[username] = styles;
 				saveCustomNickColors();
 				refreshAllColors();
@@ -259,34 +218,10 @@ function createUserSettingsPanel(username, currentStyles)
 				}
 			}},
 			{ key: 'importFile', type: 'button', label: 'Import user settings from file', buttonText: 'Load Settings File', onClick: () => {
-				loadFromFile((data, err) => {
-					if (err) {
-						alert(err.message);
-						return;
-					}
-					const userSettings = data[username] || Object.values(data)[0];
-					if (userSettings) {
-						applyImportedUserSettings(userSettings);
-						alert('Settings imported!');
-					} else {
-						alert('No valid user settings found in file');
-					}
-				});
+				loadFromFile((data, err) => importUserSettings(data, err, 'file'));
 			}},
 			{ key: 'importPaste', type: 'button', label: 'Import user settings from clipboard', buttonText: 'Paste from Clipboard', onClick: () => {
-				showPasteDialog((data, err) => {
-					if (err) {
-						alert(err.message);
-						return;
-					}
-					const userSettings = data[username] || Object.values(data)[0];
-					if (userSettings) {
-						applyImportedUserSettings(userSettings);
-						alert('Settings imported!');
-					} else {
-						alert('No valid user settings found in clipboard');
-					}
-				});
+				showPasteDialog((data, err) => importUserSettings(data, err, 'clipboard'));
 			}},
 		]},
 		{ type: 'section', label: 'Request Override', noHr: true, hint: 'If you want your nickname to show up the same for everyone using the Nick Colors script, you can request an override. If the button below doesn\'t work, you can click \'Copy to Clipboard\' above, and send it manually to <a href="/z0ylent">@z0ylent</a>.', fields: [
@@ -445,46 +380,10 @@ function createUserSettingsPanel(username, currentStyles)
 	function updatePreview() {
 		updateGradients();
 
-		// Build temporary styles object from current dialog state (using engine values)
-		const textColor = getTextColor();
 		const prependIconState = engine.getFieldValue('prependIconEnabled');
 		const appendIconState = engine.getFieldValue('appendIconEnabled');
-		const weightState = engine.getFieldValue('fontWeight');
-		const italicState = engine.getFieldValue('fontStyle');
-		const caseState = engine.getFieldValue('fontVariant');
-		const invertState = engine.getFieldValue('invert');
-
-		const tempStyles = { ...cssStringToStyles(engine.getFieldValue('customCss') || '') };
-		if (textColor) tempStyles.color = textColor;
-		if (prependIconState === true) {
-			tempStyles.prependIcon = (engine.getFieldValue('prependIcon') || '').trim();
-		} else if (prependIconState === false) {
-			tempStyles.prependIcon = '';
-		}
-		if (appendIconState === true) {
-			tempStyles.appendIcon = (engine.getFieldValue('appendIcon') || '').trim();
-		} else if (appendIconState === false) {
-			tempStyles.appendIcon = '';
-		}
-		if (weightState !== null) {
-			tempStyles.fontWeight = weightState ? 'bold' : 'normal';
-		}
-		if (italicState !== null) {
-			tempStyles.fontStyle = italicState ? 'italic' : 'normal';
-		}
-		if (caseState !== null) {
-			tempStyles.fontVariant = caseState ? 'small-caps' : 'normal';
-		}
-		if (invertState !== null) {
-			tempStyles.invert = invertState;
-		}
-		// Handle fontFamily tri-state
-		const customFontFamilyState = engine.getFieldValue('customFontFamily');
-		if (customFontFamilyState === true) {
-			tempStyles.fontFamily = engine.getFieldValue('fontFamily')?.trim() || '';
-		} else if (customFontFamilyState === false) {
-			tempStyles.fontFamily = ''; // Explicitly disabled
-		}
+		// The same styles Save will keep, so the preview never shows what Save drops
+		const tempStyles = sanitizeNickStyle(buildCurrentStyles(), 'typed') ?? {};
 
 		// Temporarily apply dialog state to customNickColors for applyStyles
 		const savedCustom = customNickColors[username];
@@ -623,6 +522,29 @@ function createUserSettingsPanel(username, currentStyles)
 		return styles;
 	}
 
+	/**
+	 * Load one user's settings from a file or the clipboard into the dialog,
+	 * keeping only what an import may set, and tell the user how it went.
+	 * @param {Object} data - parsed settings: { username: styles }
+	 * @param {Error|null} err - why reading or parsing failed
+	 * @param {string} from - 'file' or 'clipboard', for the not-found message
+	 * Side effects: fills the dialog's fields; shows an alert
+	 */
+	function importUserSettings(data, err, from) {
+		if (err) {
+			alert(err.message);
+			return;
+		}
+		const raw = data[username] || Object.values(data)[0];
+		const userSettings = sanitizeNickStyle(raw, 'imported');
+		if (!userSettings) {
+			alert(`No valid user settings found in ${from}`);
+			return;
+		}
+		applyImportedUserSettings(userSettings);
+		alert(`Settings imported!${droppedStylesNote(countDroppedStyles({ [username]: raw }, { [username]: userSettings }), 'imported')}`);
+	}
+
 	// Helper to apply imported user settings to the dialog (uses engine)
 	function applyImportedUserSettings(settings) {
 		// Apply color
@@ -639,6 +561,8 @@ function createUserSettingsPanel(username, currentStyles)
 		// Apply CSS (backgroundColor and other styles)
 		const cssProps = [];
 		if (settings.backgroundColor) cssProps.push(`background-color: ${settings.backgroundColor}`);
+		if (settings.letterSpacing) cssProps.push(`letter-spacing: ${settings.letterSpacing}`);
+		if (settings.textDecoration) cssProps.push(`text-decoration: ${settings.textDecoration}`);
 		if (cssProps.length > 0) {
 			engine.setFieldValue('customCss', cssProps.join(';\n'));
 		}

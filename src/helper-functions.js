@@ -2,7 +2,7 @@
 // GM API FALLBACKS (for testing outside userscript manager)
 // =====================================================
 
-const GM_STORAGE_KEYS = ['debugMode', 'siteConfig', 'customNickColors', 'dismissedUpdateVersion'];
+const GM_STORAGE_KEYS = ['debugMode', 'siteConfig', 'customNickColors', 'dismissedUpdateVersion', 'migrationNoticeDismissed'];
 
 const _isThenable = (value) => !!value && typeof value.then === 'function';
 

@@ -1,5 +1,7 @@
 # Cyberspace Nick Colors
 
+> **Warning:** Nick Colors is deprecated, and 1.3.5 is its last release. Its colors and notes live on in [Cyberspace Atmospheric Modulator](https://github.com/z0mbieparade/cyberspace-atmospheric-modulator), which can import your Nick Colors settings. [Install it](https://raw.githubusercontent.com/z0mbieparade/cyberspace-atmospheric-modulator/refs/heads/main/cyberspace-atmospheric-modulator.user.js), then follow [Moving from Nick Colors](https://github.com/z0mbieparade/cyberspace-atmospheric-modulator/wiki/Installing#moving-from-nick-colors).
+
 A userscript that adds consistent, hash-based colors to usernames on [Cyberspace](https://cyberspace.online) and [Cyberspace Beta](https://beta.cyberspace.online). Created because I can't handle users all being the same color in a chatroom, it gives me a headache.
 
 ## Installation
@@ -35,11 +37,11 @@ A userscript that adds consistent, hash-based colors to usernames on [Cyberspace
 - **Username icons** - Optionally prepend and/or append a hash-based icon from a customizable set to each username
 - **Per-user overrides** - Right-click any username to set custom color, icon, font family, and style variations
 - **User notes** - Add personal notes about users that display on hover (great for remembering who's who)
-- **Import/Export** - Backup and restore your settings via file or clipboard
+- **Import/Export** - Back up and restore your settings via file or clipboard. A restore keeps each user's color, background color, font, letter spacing, text decoration, icons and notes, and leaves out other custom CSS
 
 ## Nick Style Override
 
-The script links to [overrides.json](/overrides.json), and loads any colors saved there. If you'd like a style applied site-wide for other users running the script to see, message me on [Cyberspace](https://cyberspace.online/z0ylent) and I'll update it.
+The script loads any colors saved in Atmospheric Modulator's [overrides.json](https://github.com/z0mbieparade/cyberspace-atmospheric-modulator/blob/main/overrides.json), the one list both scripts share. If you'd like a style applied site-wide for other users running the script to see, message me on [Cyberspace](https://cyberspace.online/z0ylent) and I'll update it.
 
 ## Site Theme Integration
 

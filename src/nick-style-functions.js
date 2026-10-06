@@ -434,13 +434,6 @@ function applyStyles(element, username, options = {})
 		styles = { ...options.overrideStyles };
 	}
 
-	if (styles.data) {
-		for (const key in styles.data) {
-			element.dataset[key] = styles.data[key];
-		}
-		delete styles.data;
-	}
-
 	// Clear previous inline styles before applying new ones
 	// This ensures old background-color/padding from inversion is removed when no longer needed
 	element.style.cssText = '';
@@ -531,9 +524,9 @@ function showDebugTooltip(e) {
 	debugTooltip.innerHTML = debugData
 		.map(([label, value]) => {
 			const displayValue = typeof value === 'string' && value.startsWith('hsl')
-				? `<span class="nc-debug-swatch" style="background:${value}"></span>${value}`
-				: value;
-			return `<div class="nc-debug-row"><span class="nc-debug-label">${label}:</span> <span class="nc-debug-value">${displayValue}</span></div>`;
+				? `<span class="nc-debug-swatch" style="background:${escapeHtml(value)}"></span>${escapeHtml(value)}`
+				: escapeHtml(value);
+			return `<div class="nc-debug-row"><span class="nc-debug-label">${escapeHtml(label)}:</span> <span class="nc-debug-value">${displayValue}</span></div>`;
 		})
 		.join('');
 

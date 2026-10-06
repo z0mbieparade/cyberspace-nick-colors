@@ -2,9 +2,21 @@
 // USERNAME DETECTION
 // =====================================================
 
+/**
+ * Whether a name found on the page, in storage or in a settings file is one
+ * to color. Rejects names that are Object.prototype keys (case as given:
+ * styles are stored under the name as found), excluded words and names with
+ * spaces.
+ * @param {string} username - with or without a leading @
+ * @returns {boolean}
+ */
 function isValidUsername(username) {
 	if (!username) return false;
 	if (username.startsWith('@')) username = username.slice(1);
+	// Names are keys of plain objects (customNickColors, overrides): one
+	// Object.prototype holds, such as __proto__ or toString, would read or
+	// write through it
+	if (username.trim() in Object.prototype) return false;
 	username = username.trim().toLowerCase();
 
 	if (EXCLUDE_VALUES.includes(username)) return false;

@@ -21,7 +21,12 @@ function logDebug(...args) {
 
 // URL to fetch manual overrides from (set to null to disable)
 // Host your overrides.json on GitHub, Gist, or any CORS-friendly location
-const OVERRIDES_URL = 'https://raw.githubusercontent.com/z0mbieparade/cyberspace-nick-colors/refs/heads/main/overrides.json';
+const OVERRIDES_URL = 'https://raw.githubusercontent.com/z0mbieparade/cyberspace-atmospheric-modulator/refs/heads/main/overrides.json';
+
+// Nick Colors is retired into Cyberspace Atmospheric Modulator: where to
+// install it, and its guide to importing these settings
+const ATMOMOD_INSTALL_URL = 'https://raw.githubusercontent.com/z0mbieparade/cyberspace-atmospheric-modulator/refs/heads/main/cyberspace-atmospheric-modulator.user.js';
+const ATMOMOD_MOVING_URL = 'https://github.com/z0mbieparade/cyberspace-atmospheric-modulator/wiki/Installing#moving-from-nick-colors';
 
 // Detect if we're on the beta site (different HTML structure)
 const IS_BETA_SITE = window.location.hostname === 'beta.cyberspace.online';
@@ -233,7 +238,7 @@ function loadSiteConfig() {
 	try {
 		const savedSiteConfig = _GM_getValue('siteConfig', null);
 		if (savedSiteConfig) {
-			siteConfig = { ...DEFAULT_SITE_CONFIG, ...JSON.parse(savedSiteConfig) };
+			siteConfig = { ...DEFAULT_SITE_CONFIG, ...sanitizeSiteConfig(JSON.parse(savedSiteConfig)) };
 		}
 	} catch (e) {
 		console.error('[Nick Colors] Failed to load site config:', e);
@@ -254,7 +259,7 @@ let customNickColors = {};
 function loadCustomNickColors() {
 	try {
 		const saved = _GM_getValue('customNickColors', '{}');
-		customNickColors = JSON.parse(saved);
+		customNickColors = sanitizeNickStyles(JSON.parse(saved), 'typed');
 	} catch (e) {
 		customNickColors = {};
 	}

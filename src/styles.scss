@@ -7,6 +7,29 @@
 // --nc-error, --nc-warn, --nc-success, --nc-info
 // --nc-error-bg, --nc-warn-bg, --nc-success-bg, --nc-info-bg
 
+// Links, and buttons that look like links, inside a sentence: the
+// deprecation lines in the dialog footer and the migration banner. In the
+// sentence's color, so the underline marks them; a .nc-text-link button is
+// bold too, so the one thing to do first stands out
+@mixin in-sentence-controls {
+	a,
+	button.nc-text-link {
+		color: inherit;
+		text-decoration: underline;
+	}
+
+	button.nc-text-link {
+		flex: none;
+		display: inline;
+		background: none;
+		border: none;
+		padding: 0;
+		font: inherit;
+		font-weight: bold;
+		cursor: pointer;
+	}
+}
+
 // =====================================================
 // DIALOG STYLES
 // =====================================================
@@ -337,6 +360,17 @@
 				}
 			}
 		}
+	}
+
+	.nc-dialog-deprecated {
+		width: 100%;
+		margin-top: var(--spacing-xs);
+		text-align: right;
+		font-size: calc(var(--font-size-base) * 0.875);
+		line-height: calc(var(--line-height-base) * 0.875);
+		color: var(--nc-warn);
+
+		@include in-sentence-controls;
 	}
 
 	.nc-dialog-error,
@@ -782,6 +816,8 @@
 	.nc-update-banner-text {
 		flex: 1 1 auto;
 		min-width: 0;
+
+		@include in-sentence-controls;
 	}
 
 	.nc-update-banner-actions {
@@ -791,11 +827,13 @@
 		gap: var(--spacing-sm, 0.5rem);
 	}
 
-	button.link-brackets {
+	button.link-brackets,
+	a.link-brackets {
 		background: none;
 		border: none;
 		padding: 0;
 		color: var(--nc-warn);
+		text-decoration: none;
 		text-transform: uppercase;
 		cursor: pointer;
 		font-size: inherit;

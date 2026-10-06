@@ -133,7 +133,9 @@ function checkForUpdates() {
 					} catch (e) { /* ignore */ }
 					resolve();
 				},
-				onerror: () => resolve()
+				onerror: () => resolve(),
+				ontimeout: () => resolve(),
+				onabort: () => resolve()
 			});
 		} else {
 			fetch(updateURL)
@@ -143,6 +145,18 @@ function checkForUpdates() {
 				.finally(resolve);
 		}
 	});
+}
+
+/**
+ * Merge fetched overrides under the local ones. overrides.json is a remote
+ * file the user did not choose, so it gets only the imported styles.
+ * @param {*} remoteOverrides - parsed overrides.json
+ * Side effects: replaces MANUAL_OVERRIDES
+ */
+function mergeRemoteOverrides(remoteOverrides) {
+	const safe = sanitizeNickStyles(remoteOverrides, 'imported');
+	MANUAL_OVERRIDES = { ...safe, ...MANUAL_OVERRIDES };
+	logDebug('[Nick Colors] Loaded remote overrides:', Object.keys(safe).length);
 }
 
 // Fetch remote overrides
@@ -156,9 +170,7 @@ function fetchOverrides() {
 				url: OVERRIDES_URL,
 				onload: (response) => {
 					try {
-						const remoteOverrides = JSON.parse(response.responseText);
-						MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
-						logDebug('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
+						mergeRemoteOverrides(JSON.parse(response.responseText));
 					} catch (e) {
 						console.error('[Nick Colors] Failed to parse remote overrides:', e);
 					}
@@ -167,16 +179,15 @@ function fetchOverrides() {
 				onerror: (e) => {
 					console.error('[Nick Colors] Failed to fetch remote overrides:', e);
 					resolve();
-				}
+				},
+				ontimeout: () => resolve(),
+				onabort: () => resolve()
 			});
 		} else {
 			// Fallback to fetch (may fail due to CORS)
 			fetch(OVERRIDES_URL)
 				.then(r => r.json())
-				.then(remoteOverrides => {
-					MANUAL_OVERRIDES = { ...remoteOverrides, ...MANUAL_OVERRIDES };
-					logDebug('[Nick Colors] Loaded remote overrides:', Object.keys(remoteOverrides).length);
-				})
+				.then(mergeRemoteOverrides)
 				.catch(e => console.error('[Nick Colors] Failed to fetch remote overrides:', e))
 				.finally(resolve);
 		}
@@ -189,6 +200,7 @@ initCssVariables();
 // Initial colorization (after fetching overrides) and update check
 fetchOverrides().then(() => {
 	colorizeAll();
+	showMigrationBanner();
 	checkForUpdates().then(() => {
 		if (UPDATE_AVAILABLE) showUpdateBanner(UPDATE_AVAILABLE);
 	});

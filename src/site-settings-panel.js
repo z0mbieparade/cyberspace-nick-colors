@@ -165,11 +165,7 @@ function createSettingsPanel()
 
 		{ type: 'section', label: 'Backup', fields: [
 			{ type: 'button', label: 'Export settings to file', id: 'settings-export-file', buttonText: 'Save Settings File',
-				onClick: () => {
-					const data = exportSettings();
-					const timestamp = new Date().toISOString().slice(0, 10);
-					saveToFile(data, `nick-colors-settings-${timestamp}.json`);
-				}},
+				onClick: exportSettingsToFile },
 			{ type: 'button', label: 'Export settings to clipboard', id: 'settings-export-copy', buttonText: 'Copy to Clipboard',
 				onClick: async () => {
 					try {

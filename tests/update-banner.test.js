@@ -12,6 +12,26 @@ import { TEST_VERSION } from './setup.js';
 // The version the fixture reports as installed; the literals below sit either side of it
 const LOCAL_VERSION = TEST_VERSION;
 
+/**
+ * Run fn with downloads captured instead of started: jsdom cannot download.
+ * @param {function(string[]): *} fn - gets the list of downloaded file names
+ * @returns {Promise} settles after fn, with the stubs restored
+ */
+async function withDownloadStub(fn) {
+	const downloads = [];
+	const originalClick = window.HTMLAnchorElement.prototype.click;
+	const { createObjectURL, revokeObjectURL } = URL;
+	window.HTMLAnchorElement.prototype.click = function () { downloads.push(this.download); };
+	URL.createObjectURL = () => 'blob:test';
+	URL.revokeObjectURL = () => {};
+	try {
+		await fn(downloads);
+	} finally {
+		window.HTMLAnchorElement.prototype.click = originalClick;
+		Object.assign(URL, { createObjectURL, revokeObjectURL });
+	}
+}
+
 describe('compareVersions', () => {
 	it('orders by numeric segment, not string', () => {
 		// The case a lexicographic compare gets backwards
@@ -113,5 +133,77 @@ describe('showUpdateBanner', () => {
 
 			expect(getDismissedUpdateVersion()).toBe('');
 		});
+	});
+});
+
+describe('showMigrationBanner', () => {
+	beforeEach(() => {
+		document.getElementById(UPDATE_BANNER_ID)?.remove();
+		document.getElementById(MIGRATION_BANNER_ID)?.remove();
+		GM_setValue('migrationNoticeDismissed', '');
+		saveDismissedUpdateVersion('');
+	});
+
+	it('links to the install and the moving guide', () => {
+		const banner = showMigrationBanner();
+		expect(banner.querySelector('.nc-update-banner-install').href).toMatch(/cyberspace-atmospheric-modulator\.user\.js$/);
+		expect(banner.querySelector('.nc-update-banner-moving').href).toMatch(/#moving-from-nick-colors$/);
+	});
+
+	it('stays hidden for good once dismissed with x, but not after LATER', () => {
+		showMigrationBanner().querySelector('.nc-update-banner-later').click();
+		document.getElementById(MIGRATION_BANNER_ID).remove();
+		expect(showMigrationBanner()).not.toBeNull();
+
+		document.getElementById(MIGRATION_BANNER_ID).querySelector('.nc-update-banner-dismiss').click();
+		document.getElementById(MIGRATION_BANNER_ID).remove();
+		expect(showMigrationBanner()).toBeNull();
+	});
+
+	it('gives way to an update banner', () => {
+		showMigrationBanner();
+		showUpdateBanner('1.3.4');
+		expect(document.getElementById(MIGRATION_BANNER_ID)).toBeNull();
+	});
+
+	it('downloads the settings file from export your settings, and stays up for INSTALL', async () => {
+		await withDownloadStub(async (downloads) => {
+			const banner = showMigrationBanner();
+			// The slide-in class lands a frame later
+			await new Promise(resolve => setTimeout(resolve, 10));
+			banner.querySelector('.nc-update-banner-export').click();
+			expect(downloads).toEqual([expect.stringMatching(/^nick-colors-settings-\d{4}-\d{2}-\d{2}\.json$/)]);
+			expect(banner.classList.contains('nc-update-banner-visible')).toBe(true);
+		});
+	});
+
+	it('waits while the update banner holds the top of the page', () => {
+		showUpdateBanner('1.3.4');
+		expect(showMigrationBanner()).toBeNull();
+	});
+});
+
+describe('showUpdateBanner escaping', () => {
+	it('shows a fetched version as text', () => {
+		document.getElementById(UPDATE_BANNER_ID)?.remove();
+		saveDismissedUpdateVersion('');
+		const banner = showUpdateBanner('9.9.9<img src=x>');
+		expect(banner.querySelector('img')).toBeNull();
+		document.getElementById(UPDATE_BANNER_ID)?.remove();
+	});
+});
+
+describe('dialog footer deprecation line', () => {
+	it('downloads the settings file from export your settings', async () => {
+		let dialog;
+		try {
+			await withDownloadStub((downloads) => {
+				dialog = createDialog({ title: 'Test', content: '' });
+				dialog.querySelector('.nc-export-settings').click();
+				expect(downloads).toEqual([expect.stringMatching(/^nick-colors-settings-\d{4}-\d{2}-\d{2}\.json$/)]);
+			});
+		} finally {
+			dialog?.close();
+		}
 	});
 });

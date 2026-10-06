@@ -57,6 +57,7 @@ const SRC_DIR = join(process.cwd(), 'src');
 
 const sourceFiles = [
 	'helper-functions.js',
+	'sanitize.js',
 	'header.js',
 	'import-export.js',
 	'send-message.js',
@@ -120,8 +121,18 @@ const script = new Function(code + `
 		compareVersions,
 		isNewerVersion,
 
+		// Sanitizing
+		escapeHtml,
+		sanitizeSiteConfig,
+		sanitizeNickStyle,
+		sanitizeNickStyles,
+		countDroppedStyles,
+		createInputRow,
+
 		// Update banner
 		showUpdateBanner,
+		showMigrationBanner,
+		MIGRATION_BANNER_ID,
 		getScriptURL,
 		getDismissedUpdateVersion,
 		saveDismissedUpdateVersion,
@@ -130,6 +141,7 @@ const script = new Function(code + `
 		// Import/Export
 		getNonDefaultValues,
 		exportSettings,
+		createDialog,
 		importSettings,
 		minifyKeys,
 		maxifyKeys,

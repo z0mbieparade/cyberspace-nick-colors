@@ -301,3 +301,20 @@ describe('v1 to v2 migration', () => {
 		expect(siteConfig.contrastThreshold).toBe(5);
 	});
 });
+
+describe('importSettings sanitizing', () => {
+	it('keeps only known site settings, clamped to their range', () => {
+		importSettings({ siteConfig: { minSaturation: 500, iconSet: 7, bogus: 'x' } });
+		expect(siteConfig.minSaturation).toBe(100);
+		expect(siteConfig.iconSet).toBe(DEFAULT_SITE_CONFIG.iconSet);
+		expect('bogus' in siteConfig).toBe(false);
+	});
+
+	it('drops unsafe user styles and says how many', () => {
+		const result = importSettings({ customNickColors: {
+			alice: { color: '#f00', userNotes: 'met in <cIRC>', position: 'fixed', backgroundColor: 'url(https://evil/x)' },
+		} });
+		expect(customNickColors.alice).toEqual({ color: '#f00', userNotes: 'met in <cIRC>' });
+		expect(result.message).toContain('2 styles were left out');
+	});
+});
